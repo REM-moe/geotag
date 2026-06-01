@@ -34,7 +34,7 @@ class GeotagApp extends StatelessWidget {
               ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.dark);
 
           return MaterialApp(
-            title: 'Geotag',
+            title: 'Geotag: GPS Map Camera',
             debugShowCheckedModeBanner: false,
             themeMode: ThemeMode.system,
             theme: _build(light),
