@@ -3,9 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'tokens.dart';
 
+/// When true (golden/screenshot tests only), uses locally loaded Figtree &
+/// JetBrainsMono families instead of runtime GoogleFonts HTTP fetching.
+@visibleForTesting
+bool kUseLocalTestFonts = false;
+
 /// Monospace style for coordinates, altitude, timestamps.
 TextStyle monoStyle({double size = TextSize.xs, Color? color, FontWeight? weight}) =>
-    GoogleFonts.jetBrainsMono(fontSize: size, color: color, fontWeight: weight);
+    kUseLocalTestFonts
+        ? TextStyle(fontFamily: 'JetBrainsMono', fontSize: size, color: color, fontWeight: weight)
+        : GoogleFonts.jetBrainsMono(fontSize: size, color: color, fontWeight: weight);
 
 ThemeData buildTheme(Brightness brightness) {
   final g = brightness == Brightness.dark ? GeoColors.dark : GeoColors.light;
@@ -41,7 +48,10 @@ ThemeData buildTheme(Brightness brightness) {
     highlightColor: Colors.transparent,
   );
 
-  final text = GoogleFonts.figtreeTextTheme(base.textTheme).apply(
+  final text = (kUseLocalTestFonts
+          ? base.textTheme.apply(fontFamily: 'Figtree')
+          : GoogleFonts.figtreeTextTheme(base.textTheme))
+      .apply(
     bodyColor: g.text,
     displayColor: g.text,
   );
