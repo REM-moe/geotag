@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Offset;
 
 import 'package:camera/camera.dart' as cam;
 import 'package:equatable/equatable.dart';
@@ -6,174 +7,292 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 enum CaptureMode { photo, video }
 
-enum GeotagFlash { off, on, auto }
-
-enum SelfTimer {
-  off(0),
-  s3(3),
-  s5(5),
-  s10(10),
-  s20(20);
-
-  final int seconds;
-  const SelfTimer(this.seconds);
-}
+/// `idle`         – no controller (paused, tab hidden, not permitted yet).
+/// `initializing` – opening / switching the camera.
+/// `ready`        – preview running.
+/// `error`        – the camera could not be opened ([CameraStateData.error]).
+enum CamStatus { idle, initializing, ready, error }
 
 /// Physical lens role inferred from `CameraDescription.name`. Used to map
-/// zoom presets (0.5×, 1×, 2×, 5×) to actual hardware lenses on devices that
-/// have multiple back cameras (iPhone 11+ etc.).
+/// zoom presets (0.5×, 1×, 2×, 5×) to hardware lenses on devices that expose
+/// several back cameras (iPhone 11+ etc.).
 enum LensRole { ultraWide, wide, telephoto2x, telephoto5x, other }
 
-class LensOption {
+class LensOption extends Equatable {
   final int cameraIndex;
   final LensRole role;
   final double label;
   const LensOption({required this.cameraIndex, required this.role, required this.label});
+
+  @override
+  List<Object?> get props => [cameraIndex, role, label];
 }
 
 class CameraStateData extends Equatable {
+  final CamStatus status;
   final List<cam.CameraDescription> cameras;
   final int activeIndex;
   final CaptureMode mode;
-  final GeotagFlash flash;
-  final bool isInitializing;
+  final bool flashOn;
+  final bool gridOn;
   final bool isRecording;
   final String? error;
   final double minZoom;
   final double maxZoom;
   final double zoom;
   final Duration recordingElapsed;
-  final SelfTimer timer;
-  final int? countdown;
   final List<LensOption> backLenses;
 
+  /// Whether the current controller records audio.
+  final bool audioEnabled;
+
+  /// Bumped every time the underlying controller instance changes so widgets
+  /// holding the old controller rebuild.
+  final int generation;
+
+  /// Spot note that will be attached to (and shown on) the next capture.
+  final String draftNote;
+
   const CameraStateData({
+    this.status = CamStatus.idle,
     this.cameras = const [],
     this.activeIndex = 0,
     this.mode = CaptureMode.photo,
-    this.flash = GeotagFlash.off,
-    this.isInitializing = true,
+    this.flashOn = false,
+    this.gridOn = false,
     this.isRecording = false,
     this.error,
     this.minZoom = 1.0,
     this.maxZoom = 1.0,
     this.zoom = 1.0,
     this.recordingElapsed = Duration.zero,
-    this.timer = SelfTimer.off,
-    this.countdown,
     this.backLenses = const [],
+    this.audioEnabled = false,
+    this.generation = 0,
+    this.draftNote = '',
   });
 
-  bool get isFront => cameras.isNotEmpty &&
+  bool get isReady => status == CamStatus.ready;
+
+  bool get isFront =>
       activeIndex >= 0 &&
       activeIndex < cameras.length &&
       cameras[activeIndex].lensDirection == cam.CameraLensDirection.front;
 
+  LensOption get activeLens => backLenses.firstWhere(
+        (l) => l.cameraIndex == activeIndex,
+        orElse: () => const LensOption(cameraIndex: 0, role: LensRole.wide, label: 1.0),
+      );
+
+  /// Zoom the user perceives: lens label × digital zoom.
+  double get effectiveZoom => isFront ? zoom : activeLens.label * zoom;
+
+  /// Whether a 0.5× preset can be offered (ultra-wide lens or logical
+  /// multi-camera with min zoom < 1).
+  bool get canUltraWide =>
+      !isFront && (backLenses.any((l) => l.role == LensRole.ultraWide) || minZoom < 0.95);
+
   CameraStateData copyWith({
+    CamStatus? status,
     List<cam.CameraDescription>? cameras,
     int? activeIndex,
     CaptureMode? mode,
-    GeotagFlash? flash,
-    bool? isInitializing,
+    bool? flashOn,
+    bool? gridOn,
     bool? isRecording,
     String? error,
+    bool clearError = false,
     double? minZoom,
     double? maxZoom,
     double? zoom,
     Duration? recordingElapsed,
-    SelfTimer? timer,
-    int? countdown,
-    bool clearCountdown = false,
     List<LensOption>? backLenses,
+    bool? audioEnabled,
+    int? generation,
+    String? draftNote,
   }) =>
       CameraStateData(
+        status: status ?? this.status,
         cameras: cameras ?? this.cameras,
         activeIndex: activeIndex ?? this.activeIndex,
         mode: mode ?? this.mode,
-        flash: flash ?? this.flash,
-        isInitializing: isInitializing ?? this.isInitializing,
+        flashOn: flashOn ?? this.flashOn,
+        gridOn: gridOn ?? this.gridOn,
         isRecording: isRecording ?? this.isRecording,
-        error: error,
+        error: clearError ? null : (error ?? this.error),
         minZoom: minZoom ?? this.minZoom,
         maxZoom: maxZoom ?? this.maxZoom,
         zoom: zoom ?? this.zoom,
         recordingElapsed: recordingElapsed ?? this.recordingElapsed,
-        timer: timer ?? this.timer,
-        countdown: clearCountdown ? null : (countdown ?? this.countdown),
         backLenses: backLenses ?? this.backLenses,
+        audioEnabled: audioEnabled ?? this.audioEnabled,
+        generation: generation ?? this.generation,
+        draftNote: draftNote ?? this.draftNote,
       );
 
   @override
   List<Object?> get props => [
+        status,
         cameras,
         activeIndex,
         mode,
-        flash,
-        isInitializing,
+        flashOn,
+        gridOn,
         isRecording,
         error,
         minZoom,
         maxZoom,
         zoom,
         recordingElapsed,
-        timer,
-        countdown,
         backLenses,
+        audioEnabled,
+        generation,
+        draftNote,
       ];
 }
 
+/// Result of a finished recording.
+class RecordedVideo {
+  final cam.XFile file;
+  final Duration duration;
+  const RecordedVideo(this.file, this.duration);
+}
+
+/// Owns the [cam.CameraController].
+///
+/// All controller mutations (open, switch lens, pause) are serialised through
+/// a single queue so rapid lifecycle / tab / permission events can't race.
+/// The screen calls [start] when the camera may run and [pause] when it must
+/// be released (app paused/hidden, Capture tab unmounted).
 class CameraCubit extends Cubit<CameraStateData> {
   CameraCubit() : super(const CameraStateData());
 
   cam.CameraController? _controller;
+  Future<void> _queue = Future.value();
+  bool _wantRunning = false;
+  bool _wantAudio = false;
   Timer? _recordTicker;
   DateTime? _recordStartedAt;
 
   cam.CameraController? get controller => _controller;
 
-  Future<void> init() async {
-    try {
-      emit(state.copyWith(isInitializing: true, error: null));
-      final cameras = await cam.availableCameras();
-      if (cameras.isEmpty) {
-        emit(state.copyWith(isInitializing: false, error: 'No cameras available.'));
-        return;
-      }
-
-      final lenses = _detectBackLenses(cameras);
-      emit(state.copyWith(backLenses: lenses));
-
-      // Default to the "wide" (1×) lens. Fall back to first back, else first.
-      final wide = lenses.firstWhere(
-        (l) => l.role == LensRole.wide,
-        orElse: () => lenses.isNotEmpty
-            ? lenses.first
-            : const LensOption(cameraIndex: 0, role: LensRole.other, label: 1.0),
-      );
-      int idx = wide.cameraIndex;
-      if (lenses.isEmpty) {
-        idx = cameras.indexWhere((c) => c.lensDirection == cam.CameraLensDirection.back);
-        if (idx < 0) idx = 0;
-      }
-      await _setupController(cameras, idx);
-    } catch (e) {
-      emit(state.copyWith(isInitializing: false, error: e.toString()));
-    }
+  void _set(CameraStateData s) {
+    if (!isClosed) emit(s);
   }
 
-  /// Inspect `CameraDescription.name` strings to figure out which physical
-  /// back lens each entry corresponds to. iOS reports descriptive names like
-  /// "Back Ultra Wide Camera"; Android (with camerax variant) gives ID-style
-  /// names — there we keep only the first back camera and assume 1×.
-  List<LensOption> _detectBackLenses(List<cam.CameraDescription> all) {
-    final back = <int>[];
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].lensDirection == cam.CameraLensDirection.back) back.add(i);
-    }
-    if (back.isEmpty) return const [];
+  Future<void> _enqueue(Future<void> Function() op) {
+    final next = _queue.then((_) => op()).catchError((Object e) {
+      _set(state.copyWith(status: CamStatus.error, error: _describe(e)));
+    });
+    _queue = next;
+    return next;
+  }
 
+  static String _describe(Object e) {
+    if (e is cam.CameraException) {
+      switch (e.code) {
+        case 'CameraAccessDenied':
+        case 'CameraAccessDeniedWithoutPrompt':
+        case 'CameraAccessRestricted':
+          return 'Camera access is off.';
+        case 'AudioAccessDenied':
+        case 'AudioAccessDeniedWithoutPrompt':
+        case 'AudioAccessRestricted':
+          return 'Microphone access is off.';
+      }
+      return e.description ?? e.code;
+    }
+    return e.toString();
+  }
+
+  /// Opens the camera (if not already running with the requested audio).
+  Future<void> start({required bool audio}) {
+    _wantRunning = true;
+    _wantAudio = audio;
+    return _enqueue(() async {
+      if (!_wantRunning || isClosed) return;
+      final c = _controller;
+      if (c != null && c.value.isInitialized && (state.audioEnabled == _wantAudio || state.isRecording)) return;
+
+      var cameras = state.cameras;
+      var lenses = state.backLenses;
+      var index = state.activeIndex;
+      if (cameras.isEmpty) {
+        _set(state.copyWith(status: CamStatus.initializing, clearError: true));
+        cameras = await cam.availableCameras();
+        if (cameras.isEmpty) {
+          _set(state.copyWith(status: CamStatus.error, error: 'No camera found on this device.'));
+          return;
+        }
+        lenses = _detectBackLenses(cameras);
+        index = _defaultIndex(cameras, lenses);
+        _set(state.copyWith(cameras: cameras, backLenses: lenses, activeIndex: index));
+      }
+      await _open(index);
+    });
+  }
+
+  /// Releases the camera hardware. Safe to call repeatedly. If a recording
+  /// was in progress it is finished and returned so the caller can save it.
+  Future<RecordedVideo?> pause() async {
+    _wantRunning = false;
+    final started = _recordStartedAt;
+    final wasRecording = state.isRecording;
+    _stopTicker();
+    final c = _controller;
+    _controller = null;
+    if (c != null || state.status != CamStatus.idle) {
+      _set(state.copyWith(
+        status: CamStatus.idle,
+        isRecording: false,
+        recordingElapsed: Duration.zero,
+        generation: state.generation + 1,
+      ));
+    }
+    RecordedVideo? rec;
+    await _enqueue(() async {
+      if (c == null) return;
+      if (wasRecording && c.value.isRecordingVideo) {
+        try {
+          final file = await c.stopVideoRecording();
+          rec = RecordedVideo(file, started == null ? Duration.zero : DateTime.now().difference(started));
+        } catch (_) {}
+      }
+      try {
+        await c.dispose();
+      } catch (_) {}
+    });
+    return rec;
+  }
+
+  /// Re-opens the controller with/without audio if it differs.
+  Future<void> setAudio(bool audio) {
+    if (_wantAudio == audio && state.audioEnabled == audio) return Future.value();
+    _wantAudio = audio;
+    if (!_wantRunning || state.isRecording) return Future.value();
+    return _enqueue(() async {
+      if (!_wantRunning || state.isRecording) return;
+      if (_controller != null && state.audioEnabled == _wantAudio) return;
+      await _open(state.activeIndex);
+    });
+  }
+
+  int _defaultIndex(List<cam.CameraDescription> cameras, List<LensOption> lenses) {
+    if (lenses.isNotEmpty) {
+      return lenses
+          .firstWhere((l) => l.role == LensRole.wide, orElse: () => lenses.first)
+          .cameraIndex;
+    }
+    final back = cameras.indexWhere((c) => c.lensDirection == cam.CameraLensDirection.back);
+    return back < 0 ? 0 : back;
+  }
+
+  /// iOS reports descriptive names ("Back Ultra Wide Camera"); Android
+  /// (CameraX) gives ids — there we keep the first back camera as 1×.
+  List<LensOption> _detectBackLenses(List<cam.CameraDescription> all) {
     final result = <LensOption>[];
-    for (final i in back) {
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].lensDirection != cam.CameraLensDirection.back) continue;
       final n = all[i].name.toLowerCase();
       LensRole role;
       double label;
@@ -181,231 +300,236 @@ class CameraCubit extends Cubit<CameraStateData> {
         role = LensRole.ultraWide;
         label = 0.5;
       } else if (n.contains('telephoto')) {
-        // iPhone Pro models may have 2× OR 5× telephoto; we can't reliably
-        // distinguish without focal-length info. Assume 2× if there's only
-        // one telephoto, 5× if a second appears.
-        final teles = result.where((l) =>
-            l.role == LensRole.telephoto2x || l.role == LensRole.telephoto5x);
+        final teles = result.where((l) => l.role == LensRole.telephoto2x || l.role == LensRole.telephoto5x);
         role = teles.isEmpty ? LensRole.telephoto2x : LensRole.telephoto5x;
         label = teles.isEmpty ? 2.0 : 5.0;
-      } else if (n.contains('wide') || n.contains('back camera') || n.contains('rear')) {
-        role = LensRole.wide;
-        label = 1.0;
+      } else if (n.contains('dual') || n.contains('triple')) {
+        continue; // composite virtual devices duplicate the 1× slot
       } else {
-        role = LensRole.other;
+        role = n.contains('wide') || n.contains('back') || n.contains('rear') ? LensRole.wide : LensRole.other;
         label = 1.0;
       }
       result.add(LensOption(cameraIndex: i, role: role, label: label));
     }
-
-    // Multi-cam composite entries (Dual / Triple) usually appear ALONGSIDE the
-    // single-lens entries — those duplicate 1× slots. Dedup by label, keeping
-    // the first non-composite per label.
     final byLabel = <double, LensOption>{};
     for (final l in result) {
       byLabel.putIfAbsent(l.label, () => l);
     }
-    final out = byLabel.values.toList()..sort((a, b) => a.label.compareTo(b.label));
-    return out;
+    return byLabel.values.toList()..sort((a, b) => a.label.compareTo(b.label));
   }
 
-  Future<void> selectLens(LensOption lens) async {
-    if (state.isRecording) return;
-    if (lens.cameraIndex == state.activeIndex) {
-      await setZoom(1.0);
-      return;
-    }
-    emit(state.copyWith(isInitializing: true));
-    await _setupController(state.cameras, lens.cameraIndex);
-  }
+  Future<void> _open(int index) async {
+    final cameras = state.cameras;
+    if (index < 0 || index >= cameras.length) return;
 
-  /// Standard iPhone-style preset taps. For a given desired effective zoom
-  /// (0.5/1/2/5):
-  ///   - prefer switching to a physical lens whose native label matches
-  ///   - else fall back to digital zoom on the current lens
-  Future<void> tapZoomPreset(double preset) async {
-    if (state.isRecording) return;
-
-    // Try matching physical lens (within ε to handle fp comparison).
-    LensOption? match;
-    for (final l in state.backLenses) {
-      if ((l.label - preset).abs() < 0.05) {
-        match = l;
-        break;
-      }
+    final old = _controller;
+    _controller = null;
+    _set(state.copyWith(status: CamStatus.initializing, clearError: true, generation: state.generation + 1));
+    if (old != null) {
+      try {
+        await old.dispose();
+      } catch (_) {}
     }
 
-    if (match != null && match.cameraIndex != state.activeIndex) {
-      emit(state.copyWith(isInitializing: true));
-      await _setupController(state.cameras, match.cameraIndex);
-      return;
-    }
-    if (match != null) {
-      // Same lens, reset to 1× on it.
-      await setZoom(1.0);
-      return;
-    }
-
-    // No physical lens — apply digital zoom on the currently active camera.
-    // Translate the preset to the active lens's zoom space: a preset of 2×
-    // on the 1× wide lens means setZoom(2). On a 0.5× ultra-wide, it means
-    // setZoom(2/0.5)=4.
-    final activeLens = state.backLenses.firstWhere(
-      (l) => l.cameraIndex == state.activeIndex,
-      orElse: () =>
-          const LensOption(cameraIndex: 0, role: LensRole.wide, label: 1.0),
-    );
-    final targetZoom = preset / activeLens.label;
-    await setZoom(targetZoom);
-  }
-
-  /// Effective focal-length multiplier that the user perceives: active lens
-  /// label × current digital zoom. Used by the UI to highlight the right pill.
-  double get effectiveZoom {
-    final activeLens = state.backLenses.firstWhere(
-      (l) => l.cameraIndex == state.activeIndex,
-      orElse: () =>
-          const LensOption(cameraIndex: 0, role: LensRole.wide, label: 1.0),
-    );
-    return activeLens.label * state.zoom;
-  }
-
-  Future<void> _setupController(List<cam.CameraDescription> cameras, int index) async {
-    await _controller?.dispose();
+    final audio = _wantAudio;
     final c = cam.CameraController(
       cameras[index],
-      cam.ResolutionPreset.high,
-      enableAudio: true,
-      imageFormatGroup: cam.ImageFormatGroup.jpeg,
+      state.mode == CaptureMode.photo ? cam.ResolutionPreset.max : cam.ResolutionPreset.veryHigh,
+      enableAudio: audio,
     );
-    await c.initialize();
     try {
-      await c.setFlashMode(_toPlugin(state.flash));
+      await c.initialize();
+    } catch (e) {
+      try {
+        await c.dispose();
+      } catch (_) {}
+      rethrow;
+    }
+    if (!_wantRunning || isClosed) {
+      await c.dispose();
+      return;
+    }
+    double minZ = 1, maxZ = 1;
+    try {
+      minZ = await c.getMinZoomLevel();
+      maxZ = await c.getMaxZoomLevel();
     } catch (_) {}
-    final minZ = await c.getMinZoomLevel();
-    final maxZ = await c.getMaxZoomLevel();
     _controller = c;
-    emit(state.copyWith(
-      cameras: cameras,
+    _set(state.copyWith(
+      status: CamStatus.ready,
       activeIndex: index,
-      isInitializing: false,
-      error: null,
+      clearError: true,
       minZoom: minZ,
       maxZoom: maxZ,
       zoom: 1.0,
+      audioEnabled: audio,
+      generation: state.generation + 1,
     ));
+    await _applyFlash();
   }
 
-  Future<void> flipCamera() async {
-    if (state.cameras.length < 2 || state.isRecording) return;
-    final next = (state.activeIndex + 1) % state.cameras.length;
-    emit(state.copyWith(isInitializing: true));
-    await _setupController(state.cameras, next);
+  Future<void> _switchTo(int index) {
+    if (state.isRecording) return Future.value();
+    return _enqueue(() async {
+      if (!_wantRunning) return;
+      await _open(index);
+    });
   }
 
-  Future<void> cycleFlash() async {
-    final order = [GeotagFlash.off, GeotagFlash.auto, GeotagFlash.on];
-    final next = order[(order.indexOf(state.flash) + 1) % order.length];
-    emit(state.copyWith(flash: next));
-    try {
-      await _controller?.setFlashMode(_toPlugin(next));
-    } catch (_) {}
-  }
-
-  void cycleTimer() {
-    const order = SelfTimer.values;
-    final next = order[(order.indexOf(state.timer) + 1) % order.length];
-    emit(state.copyWith(timer: next));
-  }
-
-  /// Runs the self-timer countdown, emitting `countdown` ticks each second.
-  /// Returns when the countdown reaches zero (or immediately if timer = off).
-  Future<void> runCountdown() async {
-    if (state.timer == SelfTimer.off) return;
-    for (int i = state.timer.seconds; i > 0; i--) {
-      emit(state.copyWith(countdown: i));
-      await Future.delayed(const Duration(seconds: 1));
+  /// Toggle front/back.
+  Future<void> flipCamera() {
+    if (state.cameras.length < 2 || state.isRecording) return Future.value();
+    final wantFront = !state.isFront;
+    int next;
+    if (wantFront) {
+      next = state.cameras.indexWhere((c) => c.lensDirection == cam.CameraLensDirection.front);
+    } else {
+      next = _defaultIndex(state.cameras, state.backLenses);
     }
-    emit(state.copyWith(clearCountdown: true));
+    if (next < 0) next = (state.activeIndex + 1) % state.cameras.length;
+    return _switchTo(next);
   }
 
-  void cancelCountdown() {
-    if (state.countdown != null) emit(state.copyWith(clearCountdown: true));
-  }
-
-  Future<void> setMode(CaptureMode m) async {
-    if (state.isRecording) return;
-    emit(state.copyWith(mode: m));
+  /// iPhone-style preset taps (0.5 / 1 / 2 / 5): prefer a physical lens with
+  /// that native label, else digital zoom on the current lens.
+  Future<void> tapZoomPreset(double preset) async {
+    if (state.isRecording && state.backLenses.length > 1) {
+      // Lens switching while recording would stop the recording — digital only.
+      await setZoom(preset / state.activeLens.label);
+      return;
+    }
+    if (!state.isFront) {
+      for (final l in state.backLenses) {
+        if ((l.label - preset).abs() < 0.05) {
+          if (l.cameraIndex != state.activeIndex) {
+            await _switchTo(l.cameraIndex);
+          } else {
+            await setZoom(1.0);
+          }
+          return;
+        }
+      }
+    }
+    final label = state.isFront ? 1.0 : state.activeLens.label;
+    await setZoom(preset / label);
   }
 
   Future<void> setZoom(double z) async {
-    final clamped = z.clamp(state.minZoom, state.maxZoom);
+    final clamped = z.clamp(state.minZoom, state.maxZoom).toDouble();
     try {
       await _controller?.setZoomLevel(clamped);
-      emit(state.copyWith(zoom: clamped));
+      _set(state.copyWith(zoom: clamped));
     } catch (_) {}
   }
 
+  Future<void> setFocusPoint(double x, double y) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final p = (x: x.clamp(0.0, 1.0), y: y.clamp(0.0, 1.0));
+    try {
+      await c.setFocusPoint(Offset(p.x, p.y));
+    } catch (_) {}
+    try {
+      await c.setExposurePoint(Offset(p.x, p.y));
+    } catch (_) {}
+  }
+
+  Future<void> toggleFlash() async {
+    _set(state.copyWith(flashOn: !state.flashOn));
+    await _applyFlash();
+  }
+
+  void toggleGrid() => _set(state.copyWith(gridOn: !state.gridOn));
+
+  Future<void> _applyFlash() async {
+    final c = _controller;
+    if (c == null) return;
+    final mode = !state.flashOn
+        ? cam.FlashMode.off
+        : (state.mode == CaptureMode.video ? cam.FlashMode.torch : cam.FlashMode.always);
+    try {
+      await c.setFlashMode(mode);
+    } catch (_) {}
+  }
+
+  /// Switches photo/video. The controller is re-opened because the
+  /// resolution preset and audio track differ per mode.
+  Future<void> setMode(CaptureMode m, {required bool audio}) {
+    if (state.isRecording || state.mode == m) return Future.value();
+    _set(state.copyWith(mode: m));
+    _wantAudio = audio;
+    if (!_wantRunning) return Future.value();
+    return _enqueue(() async {
+      if (!_wantRunning) return;
+      await _open(state.activeIndex);
+    });
+  }
+
+  void setDraftNote(String note) => _set(state.copyWith(draftNote: note.trim()));
+  void clearDraftNote() => _set(state.copyWith(draftNote: ''));
+
   Future<cam.XFile?> takePhoto() async {
     final c = _controller;
-    if (c == null || !c.value.isInitialized) return null;
+    if (c == null || !c.value.isInitialized || c.value.isTakingPicture) return null;
     try {
       return await c.takePicture();
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      _set(state.copyWith(error: _describe(e)));
       return null;
     }
   }
 
-  Future<void> startVideo() async {
+  Future<bool> startVideo() async {
     final c = _controller;
-    if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) return;
+    if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) return false;
     try {
       await c.startVideoRecording();
       _recordStartedAt = DateTime.now();
-      _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (_recordStartedAt == null) return;
-        emit(state.copyWith(
-          recordingElapsed: DateTime.now().difference(_recordStartedAt!),
-        ));
+      _recordTicker = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        final s = _recordStartedAt;
+        if (s == null) return;
+        _set(state.copyWith(recordingElapsed: DateTime.now().difference(s)));
       });
-      emit(state.copyWith(isRecording: true, recordingElapsed: Duration.zero));
+      _set(state.copyWith(isRecording: true, recordingElapsed: Duration.zero));
+      return true;
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      _set(state.copyWith(error: _describe(e)));
+      return false;
     }
   }
 
-  Future<cam.XFile?> stopVideo() async {
+  Future<RecordedVideo?> stopVideo() async {
     final c = _controller;
-    if (c == null || !c.value.isRecordingVideo) return null;
+    final started = _recordStartedAt;
+    _stopTicker();
+    if (c == null || !c.value.isRecordingVideo) {
+      _set(state.copyWith(isRecording: false, recordingElapsed: Duration.zero));
+      return null;
+    }
     try {
       final file = await c.stopVideoRecording();
-      _recordTicker?.cancel();
-      _recordTicker = null;
-      _recordStartedAt = null;
-      emit(state.copyWith(isRecording: false, recordingElapsed: Duration.zero));
-      return file;
+      _set(state.copyWith(isRecording: false, recordingElapsed: Duration.zero));
+      final dur = started == null ? Duration.zero : DateTime.now().difference(started);
+      return RecordedVideo(file, dur);
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), isRecording: false));
+      _set(state.copyWith(error: _describe(e), isRecording: false, recordingElapsed: Duration.zero));
       return null;
     }
   }
 
-  static cam.FlashMode _toPlugin(GeotagFlash f) {
-    switch (f) {
-      case GeotagFlash.off:
-        return cam.FlashMode.off;
-      case GeotagFlash.on:
-        return cam.FlashMode.always;
-      case GeotagFlash.auto:
-        return cam.FlashMode.auto;
-    }
+  void _stopTicker() {
+    _recordTicker?.cancel();
+    _recordTicker = null;
+    _recordStartedAt = null;
   }
 
   @override
   Future<void> close() async {
-    _recordTicker?.cancel();
-    await _controller?.dispose();
+    _wantRunning = false;
+    _stopTicker();
+    final c = _controller;
+    _controller = null;
+    await c?.dispose();
     return super.close();
   }
 }

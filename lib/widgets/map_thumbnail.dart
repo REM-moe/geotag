@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../theme/tokens.dart';
+import 'glass.dart';
+
 /// Real satellite-imagery thumbnail backed by **Esri World Imagery** tiles.
 ///
 /// 100% free, no API key, no billing. Uses a long-lived MapController and
@@ -77,20 +80,27 @@ class _MapThumbnailState extends State<MapThumbnail> {
     final centre = hasFix ? LatLng(widget.latitude!, widget.longitude!) : null;
     _appliedCentre ??= centre;
 
+    final Widget content;
     if (!widget.live) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: SizedBox(
-          width: widget.size,
-          height: widget.size,
-          child: const _MapPlaceholder(),
-        ),
+      content = SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: const _MapPlaceholder(),
       );
+    } else {
+      content = _live(hasFix, centre);
     }
+    return Container(
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.md),
+        border: Border.all(color: CamColors.hairlineStrong),
+      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(Radii.md), child: content),
+    );
+  }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
+  Widget _live(bool hasFix, LatLng? centre) {
+    return SizedBox(
         width: widget.size,
         height: widget.size,
         child: hasFix
@@ -125,7 +135,6 @@ class _MapThumbnailState extends State<MapThumbnail> {
                 ),
               )
             : const _MapPlaceholder(),
-      ),
     );
   }
 }
@@ -135,22 +144,13 @@ class _Pin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 22,
-      height: 28,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          Positioned(
-            top: 0,
-            child: Icon(Icons.location_on, color: Color(0xFFE53935), size: 28),
-          ),
-          Positioned(
-            top: 6,
-            child: Icon(Icons.circle, color: Colors.white, size: 7),
-          ),
-        ],
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: GeoColors.dark.accent,
+        border: Border.all(color: CamColors.fg, width: 2),
       ),
     );
   }
@@ -177,8 +177,8 @@ class _HeadingCone extends CustomPainter {
     final paint = Paint()
       ..shader = RadialGradient(
         colors: [
-          Colors.lightBlueAccent.withValues(alpha: 0.55),
-          Colors.lightBlueAccent.withValues(alpha: 0.0),
+          GeoColors.dark.accent.withValues(alpha: 0.55),
+          GeoColors.dark.accent.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromCircle(center: centre, radius: size.shortestSide * 0.55));
     canvas.drawPath(path, paint);
@@ -194,17 +194,9 @@ class _MapPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF38444C), Color(0xFF1F2A30)],
-        ),
-      ),
-      child: const Center(
-        child: Icon(Icons.location_searching, color: Colors.white24, size: 32),
-      ),
+    return ColoredBox(
+      color: GeoColors.dark.surface3,
+      child: const Center(child: _Pin()),
     );
   }
 }

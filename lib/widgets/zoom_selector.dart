@@ -1,86 +1,99 @@
 import 'package:flutter/material.dart';
 
-import '../cubits/camera_cubit.dart';
+import '../theme/app_theme.dart';
+import '../theme/tokens.dart';
+import '../services/capture_prefs.dart';
+import 'glass.dart';
 
-/// iPhone-native style zoom row: presets like 0.5× / 1× / 2× / 5×.
-/// A preset is shown if either (a) a physical lens with that label exists, or
-/// (b) the current lens has enough digital zoom range to reach that effective
-/// magnification. Tapping a preset either switches lenses or applies digital
-/// zoom, transparently.
+/// Glass zoom pill: `.5  1×  2  5`. The active preset shows the live zoom
+/// value (e.g. `1.4×`) after a pinch.
 class ZoomSelector extends StatelessWidget {
   final double effectiveZoom;
-  final double maxZoomOnActive;
-  final double activeLensLabel;
-  final List<LensOption> lenses;
-  final ValueChanged<double> onSelectPreset;
+  final bool showUltraWide;
+  final ValueChanged<double> onSelect;
+  final Axis direction;
 
   const ZoomSelector({
     super.key,
     required this.effectiveZoom,
-    required this.maxZoomOnActive,
-    required this.activeLensLabel,
-    required this.lenses,
-    required this.onSelectPreset,
+    required this.onSelect,
+    this.showUltraWide = true,
+    this.direction = Axis.horizontal,
   });
 
-  static const List<double> _kPresets = [0.5, 1.0, 2.0, 5.0];
+  static const _presets = [0.5, 1.0, 2.0, 5.0];
+
+  String _label(double p) => switch (p) { 0.5 => '.5', 1.0 => '1', 2.0 => '2', _ => '5' };
 
   String _fmt(double z) {
-    if (z < 1) return '${z.toStringAsFixed(1)}×';
-    if (z == z.truncateToDouble()) return '${z.toInt()}×';
-    return '${z.toStringAsFixed(1)}×';
+    final r = (z * 10).round() / 10;
+    final s = r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(1);
+    return '${s.startsWith('0.') ? s.substring(1) : s}×';
   }
 
   @override
   Widget build(BuildContext context) {
-    // Presets to show: physical lens matches OR within digital reach.
-    final shown = <double>[];
-    for (final p in _kPresets) {
-      final hasPhysical = lenses.any((l) => (l.label - p).abs() < 0.05);
-      // Digital reach: preset / active label must be within [1.0, maxZoomOnActive]
-      // (we don't allow zooming out below 1× on a given lens).
-      final digitalRatio = p / activeLensLabel;
-      final reachable = digitalRatio >= 1.0 && digitalRatio <= maxZoomOnActive;
-      if (hasPhysical || reachable) shown.add(p);
+    final presets = _presets.where((p) => showUltraWide || p >= 1).toList();
+    // Active = largest preset not above the current zoom.
+    var active = presets.first;
+    for (final p in presets) {
+      if (effectiveZoom + 0.01 >= p) active = p;
     }
 
-    if (shown.length < 2) return const SizedBox.shrink();
+    final children = [
+      for (final p in presets)
+        _ZoomButton(
+          label: p == active ? _fmt(effectiveZoom) : _label(p),
+          on: p == active,
+          onTap: () {
+            Haptics.selection();
+            onSelect(p);
+          },
+        ),
+    ];
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Row(
+    return Glass(
+      padding: const EdgeInsets.all(3),
+      child: Flex(
+        direction: direction,
         mainAxisSize: MainAxisSize.min,
-        children: shown.map((p) {
-          final selected = (effectiveZoom - p).abs() < 0.15;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: GestureDetector(
-              onTap: () => onSelectPreset(p),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: selected ? 44 : 36,
-                height: selected ? 44 : 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? Colors.amber : Colors.white.withValues(alpha: 0.06),
-                ),
-                child: Text(
-                  _fmt(p),
-                  style: TextStyle(
-                    color: selected ? Colors.black : Colors.white,
-                    fontSize: selected ? 13 : 11.5,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+        spacing: 2,
+        children: children,
+      ),
+    );
+  }
+}
+
+class _ZoomButton extends StatelessWidget {
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+  const _ZoomButton({required this.label, required this.on, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        curve: Motion.ease,
+        width: 36,
+        height: CamSize.pill,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: on ? CamColors.fgStrong : const Color(0x00000000),
+          borderRadius: BorderRadius.circular(Radii.full),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          style: monoStyle(
+            size: TextSize.xs,
+            color: on ? CamColors.black : CamColors.fgSoft,
+            weight: on ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
       ),
     );
   }

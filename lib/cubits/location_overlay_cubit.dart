@@ -8,7 +8,18 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
+/// Where the live location stands.
+///  * `ready`        – receiving live fixes.
+///  * `locating`     – permission + GPS ok, waiting for (a better) fix.
+///  * `noPermission` – location permission not granted.
+///  * `serviceOff`   – device location services are off.
+///
+/// In every state the last known values are kept so the stamp never goes
+/// blank when GPS drops.
+enum LocationStatus { ready, locating, noPermission, serviceOff }
+
 class LocationOverlayState extends Equatable {
+  final LocationStatus status;
   final double? latitude;
   final double? longitude;
   final double? heading;
@@ -22,10 +33,12 @@ class LocationOverlayState extends Equatable {
   final double? altitudeMetres;
   final double? accuracyMetres;
   final double? magneticFieldMicroTesla;
-  final DateTime updatedAt;
-  final bool hasFix;
 
-  LocationOverlayState({
+  /// Time of the last position fix (not of compass updates).
+  final DateTime? fixAt;
+
+  const LocationOverlayState({
+    this.status = LocationStatus.locating,
     this.latitude,
     this.longitude,
     this.heading,
@@ -39,31 +52,54 @@ class LocationOverlayState extends Equatable {
     this.altitudeMetres,
     this.accuracyMetres,
     this.magneticFieldMicroTesla,
-    DateTime? updatedAt,
-    this.hasFix = false,
-  }) : updatedAt = updatedAt ?? DateTime.now();
+    this.fixAt,
+  });
 
-  String get headlinePlace {
-    final parts = <String>[
-      if (subLocality != null && subLocality!.isNotEmpty) subLocality!,
-      if (administrativeArea != null && administrativeArea!.isNotEmpty) administrativeArea!,
-      if (country != null && country!.isNotEmpty) country!,
-    ];
-    return parts.isEmpty ? 'Locating…' : parts.join(', ');
+  bool get hasFix => latitude != null && longitude != null;
+  bool get isLive => status == LocationStatus.ready;
+
+  static bool _ok(String? s) => s != null && s.trim().isNotEmpty;
+
+  /// Short place name, e.g. "Indiranagar". Null until geocoded.
+  String? get placeName {
+    if (_ok(subLocality)) return subLocality;
+    if (_ok(locality)) return locality;
+    return null;
   }
 
+  /// Secondary line, e.g. "Bengaluru, India".
+  String? get areaName {
+    final parts = <String>[
+      if (_ok(locality) && locality != placeName) locality!,
+      if (_ok(administrativeArea)) administrativeArea!,
+      if (_ok(country)) country!,
+    ];
+    if (parts.isEmpty) return null;
+    return parts.take(2).join(', ');
+  }
+
+  /// "Indiranagar, Bengaluru" — used as `Capture.place`.
+  String? get shortPlace {
+    final p = placeName;
+    if (p == null) return null;
+    final a = _ok(locality) && locality != p ? locality : (_ok(administrativeArea) ? administrativeArea : null);
+    return a == null ? p : '$p, $a';
+  }
+
+  /// Full address line — used as `Capture.address`.
   String get streetBlock {
     final parts = <String>[
-      if (streetLine != null && streetLine!.isNotEmpty) streetLine!,
-      if (locality != null && locality!.isNotEmpty) locality!,
-      if (administrativeArea != null && administrativeArea!.isNotEmpty)
-        '${administrativeArea!}${postalCode != null && postalCode!.isNotEmpty ? ' $postalCode' : ''}',
-      if (country != null && country!.isNotEmpty) country!,
+      if (_ok(streetLine)) streetLine!,
+      if (_ok(locality)) locality!,
+      if (_ok(administrativeArea))
+        '${administrativeArea!}${_ok(postalCode) ? ' $postalCode' : ''}',
+      if (_ok(country)) country!,
     ];
     return parts.join(', ');
   }
 
   LocationOverlayState copyWith({
+    LocationStatus? status,
     double? latitude,
     double? longitude,
     double? heading,
@@ -77,10 +113,10 @@ class LocationOverlayState extends Equatable {
     double? altitudeMetres,
     double? accuracyMetres,
     double? magneticFieldMicroTesla,
-    DateTime? updatedAt,
-    bool? hasFix,
+    DateTime? fixAt,
   }) =>
       LocationOverlayState(
+        status: status ?? this.status,
         latitude: latitude ?? this.latitude,
         longitude: longitude ?? this.longitude,
         heading: heading ?? this.heading,
@@ -94,12 +130,12 @@ class LocationOverlayState extends Equatable {
         altitudeMetres: altitudeMetres ?? this.altitudeMetres,
         accuracyMetres: accuracyMetres ?? this.accuracyMetres,
         magneticFieldMicroTesla: magneticFieldMicroTesla ?? this.magneticFieldMicroTesla,
-        updatedAt: updatedAt ?? this.updatedAt,
-        hasFix: hasFix ?? this.hasFix,
+        fixAt: fixAt ?? this.fixAt,
       );
 
   @override
   List<Object?> get props => [
+        status,
         latitude,
         longitude,
         heading,
@@ -113,78 +149,163 @@ class LocationOverlayState extends Equatable {
         altitudeMetres,
         accuracyMetres,
         magneticFieldMicroTesla,
-        updatedAt,
-        hasFix,
+        fixAt,
       ];
 }
 
+/// Live location + compass feed for the stamp.
+///
+/// Call [start] when the Capture tab is visible and [stop] when it is not.
+/// [start] is idempotent and safe to call repeatedly (e.g. every time the
+/// permission state changes): it re-evaluates permission / GPS service and
+/// (re)starts the position stream only when it can actually produce fixes.
 class LocationOverlayCubit extends Cubit<LocationOverlayState> {
-  LocationOverlayCubit() : super(LocationOverlayState());
+  LocationOverlayCubit() : super(const LocationOverlayState());
 
   StreamSubscription<Position>? _positionSub;
   StreamSubscription<CompassEvent>? _compassSub;
   StreamSubscription<MagnetometerEvent>? _magnetoSub;
   DateTime _lastGeocode = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _starting = false;
+  bool _wanted = false;
+  bool _again = false;
+
+  void _set(LocationOverlayState s) {
+    if (!isClosed) emit(s);
+  }
 
   Future<void> start() async {
-    await stop();
+    _wanted = true;
+    _startSensors();
+    if (_starting) {
+      _again = true;
+      return;
+    }
+    _starting = true;
+    _again = false;
+    try {
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever ||
+          perm == LocationPermission.unableToDetermine) {
+        await _cancelPosition();
+        _set(state.copyWith(status: LocationStatus.noPermission));
+        return;
+      }
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        await _cancelPosition();
+        _set(state.copyWith(status: LocationStatus.serviceOff));
+        return;
+      }
+      if (!_wanted || _positionSub != null) return;
 
-    if (!await Geolocator.isLocationServiceEnabled()) return;
+      if (state.status != LocationStatus.ready) {
+        _set(state.copyWith(status: LocationStatus.locating));
+      }
 
-    // `high` ≈ ~10m accuracy. distanceFilter=0 means iOS pushes every fix
-    // (the OS already smooths internally) — necessary for the lat/long
-    // display to update as the user walks, not only after large jumps.
-    _positionSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
-      ),
-    ).listen(_onPosition);
+      // Seed with the OS cache so the stamp has something immediately.
+      if (!state.hasFix) {
+        try {
+          final last = await Geolocator.getLastKnownPosition();
+          if (last != null && !state.hasFix) {
+            _onPosition(last, live: false);
+          }
+        } catch (_) {}
+      }
+      if (!_wanted || _positionSub != null) return;
 
+      // `high` ≈ ~10 m. distanceFilter 0 so the coordinates keep updating as
+      // the user walks (the OS already smooths internally).
+      _positionSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 0),
+      ).listen(
+        (p) => _onPosition(p, live: true),
+        onError: (Object e) {
+          // Keep last known values; just reflect the new status.
+          _positionSub?.cancel();
+          _positionSub = null;
+          if (e is LocationServiceDisabledException) {
+            _set(state.copyWith(status: LocationStatus.serviceOff));
+          } else if (e is PermissionDeniedException) {
+            _set(state.copyWith(status: LocationStatus.noPermission));
+          } else {
+            _set(state.copyWith(status: LocationStatus.locating));
+          }
+        },
+        onDone: () => _positionSub = null,
+        cancelOnError: true,
+      );
+    } catch (_) {
+      _set(state.copyWith(status: LocationStatus.locating));
+    } finally {
+      _starting = false;
+      if (_again && _wanted) unawaited(start());
+    }
+  }
+
+  /// Called when the app learns that permission / GPS is no longer usable.
+  /// Stops the stream but keeps last known values.
+  Future<void> markUnavailable({required bool permissionGranted}) async {
+    await _cancelPosition();
+    _set(state.copyWith(
+      status: permissionGranted ? LocationStatus.serviceOff : LocationStatus.noPermission,
+    ));
+  }
+
+  void _startSensors() {
     // Throttle compass to ~10 Hz; raw magnetometer can fire 60+ Hz.
-    DateTime lastHeading = DateTime.fromMillisecondsSinceEpoch(0);
-    _compassSub = FlutterCompass.events?.listen((e) {
-      if (e.heading == null) return;
-      final now = DateTime.now();
-      if (now.difference(lastHeading).inMilliseconds < 100) return;
-      lastHeading = now;
-      emit(state.copyWith(heading: e.heading));
-    });
+    if (_compassSub == null) {
+      var lastHeading = DateTime.fromMillisecondsSinceEpoch(0);
+      _compassSub = FlutterCompass.events?.listen((e) {
+        final h = e.heading;
+        if (h == null) return;
+        final now = DateTime.now();
+        if (now.difference(lastHeading).inMilliseconds < 100) return;
+        lastHeading = now;
+        _set(state.copyWith(heading: (h + 360) % 360));
+      }, onError: (_) {});
+    }
+    if (_magnetoSub == null) {
+      var lastMag = DateTime.fromMillisecondsSinceEpoch(0);
+      _magnetoSub = magnetometerEventStream(samplingPeriod: const Duration(milliseconds: 200)).listen(
+        (e) {
+          final now = DateTime.now();
+          if (now.difference(lastMag).inMilliseconds < 1000) return;
+          lastMag = now;
+          _set(state.copyWith(magneticFieldMicroTesla: math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z)));
+        },
+        onError: (_) {},
+      );
+    }
+  }
 
-    // Magnetometer field strength (µT). Throttle to 1 Hz — the value is
-    // slow-moving and we just display it.
-    DateTime lastMag = DateTime.fromMillisecondsSinceEpoch(0);
-    _magnetoSub = magnetometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 200),
-    ).listen((e) {
-      final now = DateTime.now();
-      if (now.difference(lastMag).inMilliseconds < 1000) return;
-      lastMag = now;
-      final magnitude = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
-      emit(state.copyWith(magneticFieldMicroTesla: magnitude));
-    });
+  Future<void> _cancelPosition() async {
+    final sub = _positionSub;
+    _positionSub = null;
+    await sub?.cancel();
   }
 
   Future<void> stop() async {
-    await _positionSub?.cancel();
-    await _compassSub?.cancel();
-    await _magnetoSub?.cancel();
-    _positionSub = null;
+    _wanted = false;
+    await _cancelPosition();
+    final c = _compassSub, m = _magnetoSub;
     _compassSub = null;
     _magnetoSub = null;
+    await c?.cancel();
+    await m?.cancel();
   }
 
-  Future<void> _onPosition(Position p) async {
-    emit(state.copyWith(
+  Future<void> _onPosition(Position p, {required bool live}) async {
+    _set(state.copyWith(
+      status: live ? LocationStatus.ready : state.status,
       latitude: p.latitude,
       longitude: p.longitude,
       altitudeMetres: p.altitude,
       accuracyMetres: p.accuracy,
-      updatedAt: DateTime.now(),
-      hasFix: true,
+      fixAt: p.timestamp,
     ));
 
-    // Throttle geocode lookups — every ~6s max.
+    // Throttle reverse-geocoding — every ~6 s max.
     final now = DateTime.now();
     if (now.difference(_lastGeocode).inSeconds < 6) return;
     _lastGeocode = now;
@@ -193,20 +314,17 @@ class LocationOverlayCubit extends Cubit<LocationOverlayState> {
       final placemarks = await placemarkFromCoordinates(p.latitude, p.longitude);
       if (placemarks.isEmpty) return;
       final pm = placemarks.first;
-      emit(state.copyWith(
+      _set(state.copyWith(
         locality: pm.locality,
         subLocality: pm.subLocality?.isNotEmpty == true ? pm.subLocality : pm.locality,
         administrativeArea: pm.administrativeArea,
         country: pm.country,
         isoCountryCode: pm.isoCountryCode,
-        streetLine: [pm.street, pm.thoroughfare]
-            .where((s) => s != null && s.isNotEmpty)
-            .toSet()
-            .join(', '),
+        streetLine: [pm.street, pm.thoroughfare].where((s) => s != null && s.isNotEmpty).toSet().join(', '),
         postalCode: pm.postalCode,
       ));
     } catch (_) {
-      // Geocoding can fail offline — silent. Coordinates still shown.
+      // Geocoding fails offline — coordinates are still shown.
     }
   }
 
