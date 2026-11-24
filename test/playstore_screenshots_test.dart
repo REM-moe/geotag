@@ -18,6 +18,7 @@ import 'package:geotag/theme/app_theme.dart';
 import 'package:geotag/theme/theme_cubit.dart';
 import 'package:geotag/theme/tokens.dart';
 import 'package:geotag/widgets/glass.dart';
+// ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -380,7 +381,7 @@ void main() {
               Positioned(
                 left: 16,
                 right: 16,
-                bottom: 342,
+                bottom: 356,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -406,7 +407,7 @@ void main() {
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(Radii.lg),
-                        boxShadow: const [BoxShadow(color: Color(0xFF4C8DFF), spreadRadius: 2)],
+                        boxShadow: const [BoxShadow(color: Color(0xFF0866FF), spreadRadius: 2)],
                       ),
                       child: StampView(config: config, data: sampleData, liveMap: false),
                     ),
@@ -417,14 +418,17 @@ void main() {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  decoration: BoxDecoration(
-                    color: GeoColors.dark.bg,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
-                    border: Border(top: BorderSide(color: GeoColors.dark.border)),
+                child: Theme(
+                  data: buildTheme(Brightness.light),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                    decoration: BoxDecoration(
+                      color: GeoColors.light.bg,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
+                      border: Border(top: BorderSide(color: GeoColors.light.border)),
+                    ),
+                    child: const StampStudioSheet(),
                   ),
-                  child: const StampStudioSheet(),
                 ),
               ),
             ],
@@ -445,16 +449,16 @@ void main() {
     );
   });
 
-  testWidgets('2. Live Stamp Studio (real StampStudioSheet)', (tester) async {
+  testWidgets('2. Live Stamp Studio (real StampStudioSheet light)', (tester) async {
     await renderPoster(
       tester,
       filename: 'screenshot-2-stamps.png',
       headline: 'Live Stamp Studio.',
       subtitle: 'Switch layouts & styles right over your viewfinder.',
-      darkBackdrop: true,
+      darkBackdrop: false,
       phoneScreen: mockCameraPhone(
         showStudio: true,
-        config: const StampConfig(template: TemplateId.survey),
+        config: const StampConfig(template: TemplateId.survey, surface: StampSurface.solid),
       ),
     );
   });
@@ -481,14 +485,14 @@ void main() {
     );
   });
 
-  testWidgets('5. Settings & Dark Theme (real SettingsScreen dark)', (tester) async {
+  testWidgets('5. Settings & Light Theme (real SettingsScreen light)', (tester) async {
     await renderPoster(
       tester,
       filename: 'screenshot-5-settings.png',
       headline: 'Zero permission nagging.',
       subtitle: 'Light & Dark themes. Permissions only when needed.',
-      darkBackdrop: true,
-      phoneScreen: wrapProviders(const Scaffold(body: SettingsScreen()), brightness: Brightness.dark),
+      darkBackdrop: false,
+      phoneScreen: wrapProviders(const Scaffold(body: SettingsScreen()), brightness: Brightness.light),
     );
   });
 }

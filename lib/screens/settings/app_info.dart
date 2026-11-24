@@ -1,10 +1,9 @@
 /// Static app metadata shown in Settings › About.
 abstract final class AppInfo {
   /// Keep in sync with `version:` in pubspec.yaml.
-  static const version = '0.1.0';
+  static const version = '2.0.0';
 
-  /// Placeholder until the hosted policy page is live.
-  static const privacyPolicyUrl = 'https://melamphic.com/geotag/privacy';
+  static const privacyPolicyUrl = 'https://hellosalvia.com/geotag/privacy';
 }
 
 /// SharedPreferences keys owned by Settings.

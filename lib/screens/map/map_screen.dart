@@ -17,7 +17,7 @@ import '../library/captures_builder.dart';
 const _satelliteTileUrl =
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const _streetTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const _userAgentPackage = 'com.aby.geotag';
+const _userAgentPackage = 'com.melamphic.geotag';
 
 const _darkTileFilter = ColorFilter.matrix(<double>[
   -0.85, 0, 0, 0, 225,

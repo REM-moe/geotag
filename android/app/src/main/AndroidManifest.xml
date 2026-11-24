@@ -18,7 +18,7 @@
     <uses-feature android:name="android.hardware.location" android:required="false"/>
 
     <application
-        android:label="Geotag: GPS Map Camera"
+        android:label="Geotag: GPS Camera, No Ads"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
