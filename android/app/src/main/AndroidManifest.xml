@@ -4,13 +4,18 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <!-- Only needed by `gal` to save into the gallery on Android 9 and below.
+         Android 10+ uses MediaStore and needs no storage permission. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"/>
 
-    <uses-feature android:name="android.hardware.camera" android:required="true"/>
+    <!-- Any camera (front-only devices too). GPS/autofocus are optional so the
+         Play Store doesn't filter out devices without them. -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="true"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
 
     <application
         android:label="Geotag: GPS Map Camera"
@@ -53,6 +58,15 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- url_launcher: open Maps / directions and web links (Android 11+). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

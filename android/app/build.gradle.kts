@@ -20,19 +20,22 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // TODO(release): `com.example.*` is rejected by Play Console — pick the final
+        // application id (and namespace) before the first upload. Ask before changing.
         applicationId = "com.example.geotag"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // 24: required by ffmpeg_kit. 35: current Play Console target requirement.
+        minSdk = 24
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
+            // TODO(release): debug signing can't be uploaded to Play — add an upload
+            // keystore signingConfig before release. Ask before changing.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
