@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../cubits/permission_cubit.dart';
 import '../../shell/tab_cubit.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/theme_cubit.dart';
 import '../../theme/tokens.dart';
 import '../../ui/ui.dart';
 import '../library/captures_builder.dart';
@@ -67,6 +68,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(Space.s5, 0, Space.s5, Space.s8),
             children: [
+              const GeoSectionLabel('Appearance'),
+              BlocBuilder<ThemeCubit, ThemeMode>(
+                builder: (context, mode) => GeoSegmented<ThemeMode>(
+                  selected: mode,
+                  onChanged: context.read<ThemeCubit>().setMode,
+                  segments: const [
+                    GeoSegment(ThemeMode.system, 'System'),
+                    GeoSegment(ThemeMode.light, 'Light'),
+                    GeoSegment(ThemeMode.dark, 'Dark'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: Space.s4),
               const GeoSectionLabel('Permissions'),
               const _PermissionsGroup(),
               const SizedBox(height: Space.s4),

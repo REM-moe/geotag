@@ -9,6 +9,7 @@ import 'data/capture_repository.dart';
 import 'shell/app_shell.dart';
 import 'shell/tab_cubit.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_cubit.dart';
 
 class GeotagApp extends StatelessWidget {
   final CaptureRepository captures;
@@ -21,20 +22,23 @@ class GeotagApp extends StatelessWidget {
       value: captures,
       child: MultiBlocProvider(
         providers: [
+          BlocProvider(create: (_) => ThemeCubit()),
           BlocProvider(create: (_) => PermissionCubit()),
           BlocProvider(create: (_) => TabCubit()),
           BlocProvider(create: (_) => CameraCubit()),
           BlocProvider(create: (_) => LocationOverlayCubit()),
           BlocProvider(create: (_) => TemplateCubit()),
         ],
-        child: MaterialApp(
-          title: 'Geotag: GPS Map Camera',
-          debugShowCheckedModeBanner: false,
-          themeMode: ThemeMode.system,
-          theme: buildTheme(Brightness.light),
-          darkTheme: buildTheme(Brightness.dark),
-          // No permission wall: the app always opens straight into the shell.
-          home: const AppShell(),
+        child: BlocBuilder<ThemeCubit, ThemeMode>(
+          builder: (context, mode) => MaterialApp(
+            title: 'Geotag: GPS Map Camera',
+            debugShowCheckedModeBanner: false,
+            themeMode: mode,
+            theme: buildTheme(Brightness.light),
+            darkTheme: buildTheme(Brightness.dark),
+            // No permission wall: the app always opens straight into the shell.
+            home: const AppShell(),
+          ),
         ),
       ),
     );
