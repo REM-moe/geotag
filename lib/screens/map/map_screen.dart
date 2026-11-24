@@ -12,11 +12,17 @@ import '../library/capture_format.dart';
 import '../library/capture_thumb.dart';
 import '../library/captures_builder.dart';
 
-/// CARTO basemaps (OpenStreetMap data): clean neutral light/dark styles.
-const _tileLight = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const _tileDark = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const _tileSubdomains = ['a', 'b', 'c', 'd'];
-const _userAgentPackage = 'com.melamphic.geotag';
+/// Standard OpenStreetMap tiles (free, no API key). Dark mode applies a
+/// muted inverted color filter in [tileBuilder].
+const _tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const _userAgentPackage = 'com.aby.geotag';
+
+const _darkTileFilter = ColorFilter.matrix(<double>[
+  -0.85, 0, 0, 0, 225,
+  0, -0.85, 0, 0, 225,
+  0, 0, -0.85, 0, 225,
+  0, 0, 0, 1, 0,
+]);
 
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});
@@ -140,10 +146,12 @@ class _MapBodyState extends State<_MapBody> {
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: dark ? _tileDark : _tileLight,
-                        subdomains: _tileSubdomains,
+                        urlTemplate: _tileUrl,
                         userAgentPackageName: _userAgentPackage,
-                        retinaMode: RetinaMode.isHighDensity(context),
+                        tileBuilder: dark
+                            ? (context, tileWidget, tile) =>
+                                ColorFiltered(colorFilter: _darkTileFilter, child: tileWidget)
+                            : null,
                       ),
                       MarkerLayer(
                         markers: [
@@ -164,7 +172,7 @@ class _MapBodyState extends State<_MapBody> {
                       ),
                       SimpleAttributionWidget(
                         backgroundColor: g.bg.withValues(alpha: 0.8),
-                        source: Text('© OpenStreetMap · © CARTO', style: TextStyle(fontSize: 10, color: g.text2)),
+                        source: Text('© OpenStreetMap contributors', style: TextStyle(fontSize: 10, color: g.text2)),
                       ),
                     ],
                   ),
