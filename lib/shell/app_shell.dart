@@ -9,6 +9,7 @@ import '../screens/library/library_screen.dart';
 import '../screens/map/map_screen.dart';
 import '../screens/notes/notes_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import 'tab_cubit.dart';
@@ -33,6 +34,22 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     Geolocator.getServiceStatusStream().listen(
       (s) => perms.setLocationServiceEnabled(s == ServiceStatus.enabled),
       onError: (_) {},
+    );
+    _checkPlayUpdate();
+  }
+
+  Future<void> _checkPlayUpdate() async {
+    final ready = await UpdateService.checkFlexibleUpdate();
+    if (!ready || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Update downloaded and ready to install'),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'Restart',
+          onPressed: UpdateService.completeUpdate,
+        ),
+      ),
     );
   }
 
