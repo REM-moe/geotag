@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Geotag — Astryx-style UI Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   TOKENS — Astryx-style: neutral greys, hairline borders,
+   no decorative shadows, color only for interaction/feedback,
+   strict 4pt spacing scale, restrained radii.
+   ========================================================= */
+:root {
+  --font: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-full: 999px;
+
+  --t-xs: 11px; --t-sm: 12px; --t-md: 14px; --t-lg: 16px; --t-xl: 20px; --t-2xl: 26px;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur: 160ms;
+}
+
+/* Neutral · Light */
+[data-theme="neutral"][data-mode="light"] {
+  --bg: #FFFFFF;
+  --surface: #FAFAFA;
+  --surface-2: #F4F4F5;
+  --surface-3: #E9E9EB;
+  --border: #E4E4E7;
+  --border-strong: #D4D4D8;
+  --text: #18181B;
+  --text-2: #52525B;
+  --text-3: #A1A1AA;
+  --accent: #0866FF;
+  --accent-hover: #0757D9;
+  --accent-soft: #EBF2FF;
+  --on-accent: #FFFFFF;
+  --positive: #1A7F37; --positive-soft: #E8F5EC;
+  --warning: #9A6700;  --warning-soft: #FFF6E0;
+  --negative: #CF222E; --negative-soft: #FDECEC;
+  --page: #F4F4F5;
+}
+/* Neutral · Dark */
+[data-theme="neutral"][data-mode="dark"] {
+  --bg: #0B0B0C;
+  --surface: #121214;
+  --surface-2: #19191C;
+  --surface-3: #232327;
+  --border: #26262A;
+  --border-strong: #34343A;
+  --text: #F4F4F5;
+  --text-2: #A1A1AA;
+  --text-3: #63636B;
+  --accent: #4C8DFF;
+  --accent-hover: #6AA0FF;
+  --accent-soft: #14213A;
+  --on-accent: #FFFFFF;
+  --positive: #3FB950; --positive-soft: #11261A;
+  --warning: #D29922;  --warning-soft: #2A2110;
+  --negative: #F85149; --negative-soft: #2D1517;
+  --page: #050506;
+}
+/* Matcha · Light */
+[data-theme="matcha"][data-mode="light"] {
+  --bg: #FDFDFB;
+  --surface: #F8F8F4;
+  --surface-2: #F1F1EB;
+  --surface-3: #E6E6DE;
+  --border: #E2E2D9;
+  --border-strong: #CFCFC4;
+  --text: #1B1D17;
+  --text-2: #565A4F;
+  --text-3: #9EA294;
+  --accent: #4A7A35;
+  --accent-hover: #3E6A2C;
+  --accent-soft: #EDF3E7;
+  --on-accent: #FFFFFF;
+  --positive: #4A7A35; --positive-soft: #EDF3E7;
+  --warning: #9A6700;  --warning-soft: #FBF3DF;
+  --negative: #B4372B; --negative-soft: #F9E9E6;
+  --page: #EEEEE7;
+}
+/* Matcha · Dark */
+[data-theme="matcha"][data-mode="dark"] {
+  --bg: #0D0E0B;
+  --surface: #13150F;
+  --surface-2: #1A1C16;
+  --surface-3: #24271F;
+  --border: #282B22;
+  --border-strong: #363A2E;
+  --text: #F1F2EC;
+  --text-2: #A3A796;
+  --text-3: #666A5B;
+  --accent: #8DBB6E;
+  --accent-hover: #A0CB83;
+  --accent-soft: #1C2616;
+  --on-accent: #0D0E0B;
+  --positive: #8DBB6E; --positive-soft: #1C2616;
+  --warning: #D7A93E;  --warning-soft: #2A2311;
+  --negative: #E5675A; --negative-soft: #2C1614;
+  --page: #070806;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+
+body {
+  font-family: var(--font);
+  font-size: var(--t-md);
+  line-height: 1.45;
+  background: var(--page);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-10);
+  padding: var(--s-8);
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--dur) var(--ease);
+}
+
+.i { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.i-sm { width: 16px; height: 16px; }
+.i-xs { width: 14px; height: 14px; }
+
+/* =========================================================
+   PRIMITIVES
+   ========================================================= */
+.btn {
+  height: 36px; padding: 0 var(--s-4);
+  border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  font-size: var(--t-md); font-weight: 600;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--bg); border: 1px solid var(--border-strong); }
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-ghost { color: var(--text-2); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn-danger { color: var(--negative); background: var(--bg); border: 1px solid var(--border-strong); }
+.btn-block { width: 100%; }
+.btn-sm { height: 30px; padding: 0 var(--s-3); font-size: var(--t-sm); border-radius: var(--r-sm); }
+.btn-lg { height: 44px; font-size: var(--t-md); }
+
+.icon-btn {
+  width: 36px; height: 36px; border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-2);
+  transition: background var(--dur) var(--ease);
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn.bordered { border: 1px solid var(--border); background: var(--bg); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  height: 20px; padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  font-size: var(--t-xs); font-weight: 600;
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.badge .d { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge.pos { background: var(--positive-soft); color: var(--positive); border-color: transparent; }
+.badge.warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+.badge.neg { background: var(--negative-soft); color: var(--negative); border-color: transparent; }
+.badge.acc { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+.seg {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 2px; gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.seg button {
+  height: 30px; border-radius: 8px;
+  font-size: var(--t-sm); font-weight: 600; color: var(--text-2);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.seg button.on { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+
+.switch {
+  width: 36px; height: 20px; border-radius: var(--r-full);
+  background: var(--surface-3); position: relative; flex-shrink: 0;
+  transition: background var(--dur) var(--ease);
+  cursor: pointer;
+}
+.switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: transform var(--dur) var(--ease);
+}
+.switch.on { background: var(--accent); }
+.switch.on::after { transform: translateX(16px); }
+
+.field {
+  width: 100%; min-height: 40px;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  outline: none; resize: none;
+  font-size: var(--t-md);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field::placeholder { color: var(--text-3); }
+
+.search {
+  display: flex; align-items: center; gap: var(--s-2);
+  height: 36px; padding: 0 var(--s-3);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text-3);
+}
+.search input { flex: 1; border: 0; outline: 0; background: transparent; font-size: var(--t-md); color: var(--text); }
+.search input::placeholder { color: var(--text-3); }
+
+.chip {
+  height: 30px; padding: 0 var(--s-3);
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: var(--t-sm); font-weight: 500; color: var(--text-2);
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.alert {
+  display: flex; gap: var(--s-3); align-items: flex-start;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: var(--t-sm);
+}
+.alert .alert-title { font-weight: 600; color: var(--text); font-size: var(--t-sm); }
+.alert .alert-body { color: var(--text-2); margin-top: 2px; }
+.alert.info .i { color: var(--accent); }
+.alert.warn { background: var(--warning-soft); border-color: transparent; }
+.alert.warn .i { color: var(--warning); }
+
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg); }
+
+.list { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+.row {
+  display: flex; align-items: center; gap: var(--s-3);
+  min-height: 52px; padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+}
+.row:first-child { border-top: 0; }
+.row.tap { cursor: pointer; transition: background var(--dur) var(--ease); }
+.row.tap:hover { background: var(--surface); }
+.row .row-ic {
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text-2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.row .row-main { flex: 1; min-width: 0; }
+.row .row-title { font-size: var(--t-md); font-weight: 500; }
+.row .row-sub { font-size: var(--t-sm); color: var(--text-2); margin-top: 1px; }
+.row .chev { color: var(--text-3); }
+
+.section-label {
+  font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0 var(--s-1) var(--s-2);
+}
+
+.dl { display: grid; grid-template-columns: auto 1fr; }
+.dl dt, .dl dd { padding: var(--s-3) 0; border-top: 1px solid var(--border); font-size: var(--t-sm); }
+.dl dt { color: var(--text-2); padding-right: var(--s-4); }
+.dl dd { text-align: right; font-family: var(--mono); font-size: var(--t-xs); color: var(--text); display: flex; align-items: center; justify-content: flex-end; }
+.dl dt:first-of-type, .dl dd:first-of-type { border-top: 0; }
+
+.mono { font-family: var(--mono); }
+.muted { color: var(--text-2); }
+
+/* =========================================================
+   CONTROL PANEL (outside phone)
+   ========================================================= */
+.panel {
+  width: 300px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--s-6);
+  display: flex; flex-direction: column; gap: var(--s-6);
+}
+.panel h1 { font-size: var(--t-xl); font-weight: 700; letter-spacing: -0.01em; }
+.panel p.lede { font-size: var(--t-sm); color: var(--text-2); margin-top: var(--s-1); }
+.panel .group { display: flex; flex-direction: column; gap: var(--s-2); }
+.panel .nav { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.panel .nav button {
+  height: 34px; border-radius: var(--r-md); border: 1px solid var(--border);
+  font-size: var(--t-sm); font-weight: 500; color: var(--text-2); background: var(--bg);
+}
+.panel .nav button.on { border-color: var(--text); color: var(--text); background: var(--surface-2); }
+.panel .sim { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) 0; }
+.panel .sim strong { font-size: var(--t-sm); font-weight: 600; display: block; }
+.panel .sim small { font-size: var(--t-xs); color: var(--text-3); }
+
+/* =========================================================
+   PHONE
+   ========================================================= */
+.phone {
+  width: 390px; height: 844px;
+  border-radius: 54px;
+  padding: 10px;
+  background: #111;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 30px 60px -20px rgba(0,0,0,0.35);
+  flex-shrink: 0;
+}
+.device {
+  position: relative; width: 100%; height: 100%;
+  border-radius: 44px; overflow: hidden;
+  background: var(--bg);
+  user-select: none;
+}
+.island { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 104px; height: 30px; border-radius: 20px; background: #000; z-index: 90; }
+.statusbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 50px;
+  padding: 16px 28px 0;
+  display: flex; justify-content: space-between;
+  font-size: 13px; font-weight: 600;
+  z-index: 85; pointer-events: none; color: var(--text);
+}
+.statusbar.on-dark { color: #fff; }
+.homebar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 120px; height: 4px; border-radius: 4px; background: var(--text); opacity: 0.85; z-index: 95; pointer-events: none; }
+.homebar.on-dark { background: #fff; }
+
+.toast {
+  position: absolute; left: var(--s-4); right: var(--s-4); bottom: 96px;
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: var(--text); color: var(--bg);
+  border-radius: var(--r-md);
+  font-size: var(--t-sm); font-weight: 500;
+  z-index: 99;
+  opacity: 0; transform: translateY(8px); pointer-events: none;
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.toast.show { opacity: 1; transform: none; }
+.toast .ok { width: 18px; height: 18px; border-radius: 50%; background: var(--positive); color: #fff; display: flex; align-items: center; justify-content: center; }
+
+.view { position: absolute; inset: 0; display: none; flex-direction: column; }
+.view.on { display: flex; }
+
+/* App screens chrome */
+.app-header { padding: 56px var(--s-5) var(--s-3); display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.app-header h2 { font-size: var(--t-2xl); font-weight: 700; letter-spacing: -0.02em; }
+.app-header .sub { font-size: var(--t-sm); color: var(--text-2); margin-top: 2px; }
+.app-body { flex: 1; overflow-y: auto; padding: 0 var(--s-5) 108px; scrollbar-width: none; }
+.app-body::-webkit-scrollbar { display: none; }
+.stack { display: flex; flex-direction: column; gap: var(--s-4); }
+.hscroll { display: flex; gap: var(--s-2); overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--s-5) * -1); padding: 0 var(--s-5); }
+.hscroll::-webkit-scrollbar { display: none; }
+
+/* Tab bar */
+.tabbar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 84px; padding: var(--s-2) var(--s-3) 24px;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  z-index: 60;
+}
+.tabbar.on-dark { background: #000; border-top-color: #1C1C1E; }
+.tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-size: 10.5px; font-weight: 600; color: var(--text-3);
+}
+.tab.on { color: var(--text); }
+.tabbar.on-dark .tab { color: #6B6B70; }
+.tabbar.on-dark .tab.on { color: #fff; }
+.tab .capture-dot {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 2px solid currentColor;
+  display: flex; align-items: center; justify-content: center;
+}
+.tab .capture-dot span { width: 28px; height: 28px; border-radius: 50%; background: currentColor; }
+
+/* =========================================================
+   CAMERA (always dark — viewfinder chrome)
+   ========================================================= */
+.cam { background: #000; color: #fff; }
+.vf { position: absolute; inset: 0 0 84px 0; overflow: hidden; cursor: crosshair; }
+.vf-img {
+  position: absolute; inset: -6%;
+  background: #1d2420 url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=900&q=80') center/cover;
+  transition: transform 300ms var(--ease);
+}
+.vf-scrim-t { position: absolute; top: 0; left: 0; right: 0; height: 120px; background: linear-gradient(rgba(0,0,0,0.55), transparent); pointer-events: none; }
+.vf-scrim-b { position: absolute; bottom: 0; left: 0; right: 0; height: 300px; background: linear-gradient(transparent, rgba(0,0,0,0.7)); pointer-events: none; }
+.vf-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity var(--dur);
+  background-image: linear-gradient(to right, rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.25) 1px, transparent 1px);
+  background-size: 33.33% 33.33%; }
+.vf-grid.on { opacity: 1; }
+.vf-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity 90ms; z-index: 50; }
+.vf-flash.fire { opacity: 0.7; }
+.focus { position: absolute; width: 64px; height: 64px; margin: -32px; border: 1.5px solid #FFD60A; border-radius: 4px; opacity: 0; transform: scale(1.2); pointer-events: none; transition: opacity 180ms, transform 220ms var(--ease); z-index: 10; }
+.focus.show { opacity: 1; transform: none; }
+
+.cam-layer { position: absolute; inset: 0 0 84px 0; display: flex; flex-direction: column; pointer-events: none; z-index: 5; }
+.cam-layer > * { pointer-events: auto; }
+
+.cam-top { padding: 54px var(--s-4) 0; display: flex; align-items: center; justify-content: space-between; }
+.glass {
+  background: rgba(20,20,22,0.55);
+  -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+}
+.cam-ib { width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.cam-ib.on { background: #fff; color: #000; border-color: #fff; }
+.gps {
+  height: 32px; padding: 0 var(--s-3); border-radius: var(--r-full);
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  font-size: var(--t-xs); font-weight: 600; font-family: var(--mono);
+}
+.gps .d { width: 6px; height: 6px; border-radius: 50%; background: #30D158; }
+.gps.warn { background: rgba(255,214,10,0.18); border-color: rgba(255,214,10,0.45); color: #FFE680; }
+.gps.warn .d { background: #FFD60A; }
+.gps.off { background: rgba(255,69,58,0.18); border-color: rgba(255,69,58,0.45); color: #FFB1AB; }
+.gps.off .d { background: #FF453A; }
+
+.cam-inline { margin: var(--s-3) var(--s-4) 0; padding: var(--s-3); border-radius: var(--r-md); display: none; gap: var(--s-3); align-items: center; font-size: var(--t-sm); }
+.cam-inline.show { display: flex; }
+.cam-inline .t { flex: 1; }
+.cam-inline .t b { display: block; font-weight: 600; }
+.cam-inline .t span { color: rgba(255,255,255,0.65); font-size: var(--t-xs); }
+.cam-inline .act { height: 28px; padding: 0 var(--s-3); border-radius: var(--r-sm); background: #fff; color: #000; font-size: var(--t-xs); font-weight: 700; }
+
+.rec { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); height: 26px; padding: 0 var(--s-3); border-radius: var(--r-sm); background: #FF453A; color: #fff; font-family: var(--mono); font-size: var(--t-xs); font-weight: 500; display: none; align-items: center; gap: 6px; z-index: 20; }
+.rec.show { display: inline-flex; }
+
+.cam-fill { flex: 1; }
+
+.stamp-zone { padding: 0 var(--s-4) var(--s-3); display: flex; flex-direction: column; gap: var(--s-2); }
+.stamp-meta { display: flex; justify-content: space-between; align-items: center; }
+.pill-btn { height: 28px; padding: 0 var(--s-3); border-radius: var(--r-full); display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 600; max-width: 230px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pill-btn.filled { background: #fff; color: #000; border-color: #fff; }
+
+/* Stamp */
+.stamp { border-radius: var(--r-lg); padding: var(--s-3); color: #fff; }
+.stamp.s-glass { background: rgba(14,14,16,0.6); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); }
+.stamp.s-solid { background: #fff; color: #18181B; border: 1px solid #fff; }
+.stamp.s-none { padding: 0 2px; text-shadow: 0 1px 6px rgba(0,0,0,0.7); }
+.st-row { display: flex; gap: var(--s-3); align-items: center; }
+.st-map { width: 56px; height: 56px; border-radius: var(--r-md); flex-shrink: 0; position: relative; overflow: hidden; background: #2A2F2B; border: 1px solid rgba(255,255,255,0.18); }
+.st-map::before { content: ''; position: absolute; inset: 0; background: linear-gradient(28deg, transparent 47%, rgba(255,255,255,0.22) 48%, rgba(255,255,255,0.22) 51%, transparent 52%), linear-gradient(-62deg, transparent 44%, rgba(255,255,255,0.15) 45%, rgba(255,255,255,0.15) 48%, transparent 49%); }
+.st-map::after { content: ''; position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; }
+.st-body { flex: 1; min-width: 0; }
+.st-title { font-size: var(--t-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-sub { font-size: var(--t-xs); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-mono { font-family: var(--mono); font-size: 10.5px; opacity: 0.85; margin-top: var(--s-1); display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.st-note { margin-top: var(--s-2); padding-top: var(--s-2); border-top: 1px solid rgba(255,255,255,0.14); font-size: var(--t-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stamp.s-solid .st-note { border-top-color: #E4E4E7; }
+.st-big { font-size: 34px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.st-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); margin-top: var(--s-2); }
+.st-cell { padding: 6px var(--s-2); border-radius: var(--r-sm); background: rgba(255,255,255,0.08); font-family: var(--mono); font-size: 10.5px; }
+.stamp.s-solid .st-cell { background: #F4F4F5; }
+.st-cell small { display: block; font-size: 9px; opacity: 0.6; font-family: var(--font); font-weight: 600; letter-spacing: 0.04em; }
+
+.cam-controls { padding: 0 var(--s-6) var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.zoom { align-self: center; display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-full); }
+.zoom button { width: 36px; height: 28px; border-radius: var(--r-full); font-family: var(--mono); font-size: var(--t-xs); color: rgba(255,255,255,0.75); }
+.zoom button.on { background: rgba(255,255,255,0.95); color: #000; font-weight: 600; }
+.modes { align-self: center; display: flex; gap: var(--s-6); }
+.modes button { font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); padding: var(--s-1) 0; }
+.modes button.on { color: #FFD60A; }
+.shutter-row { display: flex; align-items: center; justify-content: space-between; }
+.thumb { width: 48px; height: 48px; border-radius: var(--r-md); overflow: hidden; border: 1.5px solid rgba(255,255,255,0.7); background: #222 center/cover; position: relative; }
+.thumb .n { position: absolute; right: 2px; bottom: 2px; padding: 0 4px; border-radius: 4px; background: rgba(0,0,0,0.75); font-family: var(--mono); font-size: 9px; }
+.shutter { width: 72px; height: 72px; border-radius: 50%; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; transition: transform 120ms var(--ease); }
+.shutter:active { transform: scale(0.93); }
+.shutter i { display: block; width: 58px; height: 58px; border-radius: 50%; background: #fff; transition: all 180ms var(--ease); }
+.shutter.video i { background: #FF453A; width: 54px; height: 54px; }
+.shutter.recording i { width: 24px; height: 24px; border-radius: 6px; }
+.side-btn { width: 48px; height: 48px; border-radius: var(--r-md); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 9.5px; font-weight: 600; }
+
+.cam-blocked { position: absolute; inset: 0 0 84px 0; background: #0B0B0C; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--s-8); gap: var(--s-3); }
+.cam-blocked.show { display: flex; }
+.cam-blocked .ic { width: 48px; height: 48px; border-radius: var(--r-lg); background: #19191C; border: 1px solid #26262A; display: flex; align-items: center; justify-content: center; color: #A1A1AA; }
+.cam-blocked h3 { font-size: var(--t-lg); font-weight: 600; }
+.cam-blocked p { font-size: var(--t-sm); color: #A1A1AA; max-width: 260px; }
+
+/* =========================================================
+   SHEETS
+   ========================================================= */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.4); z-index: 70; opacity: 0; pointer-events: none; transition: opacity var(--dur) var(--ease); }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 75;
+  background: var(--bg); color: var(--text);
+  border-top-left-radius: var(--r-xl); border-top-right-radius: var(--r-xl);
+  border-top: 1px solid var(--border);
+  padding: var(--s-2) var(--s-5) var(--s-8);
+  transform: translateY(102%);
+  transition: transform 260ms var(--ease);
+  max-height: 78%; overflow-y: auto;
+}
+.sheet.on { transform: none; }
+.grabber { width: 36px; height: 4px; border-radius: 4px; background: var(--border-strong); margin: 0 auto var(--s-4); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s-4); }
+.sheet-head h3 { font-size: var(--t-lg); font-weight: 600; }
+.sheet-head p { font-size: var(--t-sm); color: var(--text-2); margin-top: 2px; }
+
+/* Live stamp editing: sheet stays compact, real stamp floats above it on the viewfinder */
+.device.editing .scrim { background: transparent; }
+.device.editing .cam-layer { z-index: 77; }
+.device.editing .cam-layer > * { pointer-events: none; }
+.device.editing .stamp-zone { position: absolute; left: 0; right: 0; transition: bottom 260ms var(--ease); }
+.device.editing .stamp-meta,
+.device.editing .cam-controls,
+.device.editing .cam-inline { opacity: 0; transition: opacity var(--dur) var(--ease); }
+.device.editing .stamp { box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px rgba(255,255,255,0.12); }
+.stamp { transition: box-shadow var(--dur) var(--ease); }
+.stamp.bump { animation: bump 240ms var(--ease); }
+@keyframes bump { 0% { transform: scale(0.97); opacity: 0.55; } 100% { transform: none; opacity: 1; } }
+.edit-hint { position: absolute; left: 50%; transform: translateX(-50%); z-index: 78; display: none; height: 24px; padding: 0 var(--s-3); border-radius: var(--r-full); align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 600; transition: bottom 260ms var(--ease); }
+.device.editing .edit-hint { display: inline-flex; }
+.sheet-preview { display: none; height: 150px; border-radius: var(--r-lg); background: #222 center/cover; position: relative; overflow: hidden; margin-bottom: var(--s-2); }
+.sheet-preview.show { display: block; }
+.sheet-preview .stamp { position: absolute; left: var(--s-3); right: var(--s-3); bottom: var(--s-3); }
+
+.tpl-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); }
+.tpl-grid .tpl { padding: var(--s-2); }
+.tpl-grid .tpl span { display: none; }
+.field-chips { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.tpl {
+  text-align: left; padding: var(--s-3);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--bg);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.tpl:hover { background: var(--surface); }
+.tpl.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.tpl b { display: block; font-size: var(--t-sm); font-weight: 600; }
+.tpl span { font-size: var(--t-xs); color: var(--text-2); }
+.tpl .prev { height: 34px; border-radius: var(--r-sm); background: var(--surface-2); margin-bottom: var(--s-2); position: relative; overflow: hidden; }
+.tpl .prev::before, .tpl .prev::after { content: ''; position: absolute; left: 8px; height: 4px; border-radius: 2px; background: var(--text-3); }
+.tpl .prev::before { top: 10px; width: 50%; background: var(--text-2); }
+.tpl .prev::after { top: 20px; width: 34%; }
+
+/* =========================================================
+   LIBRARY / GALLERY
+   ========================================================= */
+.sync-card { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.sync-top { display: flex; align-items: center; gap: var(--s-3); }
+.sync-top .row-ic { width: 36px; height: 36px; border-radius: var(--r-md); background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+.meter { height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width 300ms var(--ease); }
+.meter-legend { display: flex; justify-content: space-between; font-size: var(--t-xs); color: var(--text-2); }
+
+.date-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 var(--s-1); margin-bottom: var(--s-2); }
+.date-head b { font-size: var(--t-sm); font-weight: 600; }
+.date-head span { font-size: var(--t-xs); color: var(--text-3); }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; border-radius: var(--r-md); overflow: hidden; }
+.tile { aspect-ratio: 1; position: relative; cursor: pointer; background: var(--surface-2) center/cover; }
+.tile:hover::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.12); }
+.tile .flags { position: absolute; top: 5px; right: 5px; display: flex; gap: 3px; }
+.tile .flag { width: 20px; height: 20px; border-radius: 6px; background: rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; display: flex; align-items: center; justify-content: center; }
+.tile .dur { position: absolute; left: 5px; bottom: 5px; font-family: var(--mono); font-size: 10px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+
+.empty { padding: var(--s-10) var(--s-4); text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
+.empty .ic { width: 44px; height: 44px; border-radius: var(--r-lg); background: var(--surface-2); color: var(--text-3); display: flex; align-items: center; justify-content: center; margin-bottom: var(--s-1); }
+.empty b { font-size: var(--t-md); font-weight: 600; }
+.empty span { font-size: var(--t-sm); color: var(--text-2); max-width: 240px; }
+
+/* Map */
+.map {
+  position: relative; height: 360px; border-radius: var(--r-lg); overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.map-bg { position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 44px 44px; opacity: 0.7; }
+.map-road { position: absolute; background: var(--bg); border: 1px solid var(--border); }
+.map-water { position: absolute; border-radius: 50%; background: var(--accent-soft); border: 1px solid var(--border); }
+.pin { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+.pin .bubble { width: 40px; height: 40px; border-radius: var(--r-md); border: 2px solid var(--bg); background: var(--surface-3) center/cover; box-shadow: 0 0 0 1px var(--border-strong); transition: transform var(--dur) var(--ease); }
+.pin .stem { width: 2px; height: 8px; background: var(--text); }
+.pin.on .bubble { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.12); }
+.pin .count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.map-ctrls { position: absolute; right: var(--s-3); top: var(--s-3); display: flex; flex-direction: column; gap: var(--s-2); }
+.map-ctrls .icon-btn { background: var(--bg); border: 1px solid var(--border); }
+
+/* Notes */
+.note { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); cursor: pointer; transition: background var(--dur) var(--ease); }
+.note:hover { background: var(--surface); }
+.note-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.note-loc { display: flex; align-items: center; gap: 6px; font-size: var(--t-sm); font-weight: 600; min-width: 0; }
+.note-loc span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note p { font-size: var(--t-md); color: var(--text); }
+.note-foot { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-xs); color: var(--text-3); }
+.note-thumb { width: 40px; height: 40px; border-radius: var(--r-sm); background: var(--surface-2) center/cover; flex-shrink: 0; }
+.nearby { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); }
+
+/* Detail */
+.detail-media { margin: 0 var(--s-5); aspect-ratio: 4/5; border-radius: var(--r-lg); background: #222 center/cover; position: relative; overflow: hidden; }
+.detail-media .stamp { position: absolute; left: var(--s-3); right: var(--s-3); bottom: var(--s-3); }
+
+@media (max-width: 860px) {
+  body { flex-direction: column-reverse; padding: var(--s-4); }
+  .panel { width: 390px; }
+}
+</style>
+</head>
+<body data-theme="neutral" data-mode="light">
+
+<!-- ================= CONTROL PANEL ================= -->
+<aside class="panel">
+  <div>
+    <span class="badge acc" style="margin-bottom:var(--s-3);">Prototype · v3</span>
+    <h1>Geotag</h1>
+    <p class="lede">Astryx-style system: neutral tokens, 4pt spacing, hairline borders, colour only for actions and status.</p>
+  </div>
+
+  <div class="group">
+    <div class="section-label">Theme</div>
+    <div class="seg" id="segTheme">
+      <button class="on" data-v="neutral">Neutral</button>
+      <button data-v="matcha">Matcha</button>
+    </div>
+    <div class="seg" id="segMode">
+      <button class="on" data-v="light">Light</button>
+      <button data-v="dark">Dark</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="section-label">Screens</div>
+    <div class="nav" id="panelNav">
+      <button data-go="camera" class="on">Capture</button>
+      <button data-go="library">Library</button>
+      <button data-go="map">Map</button>
+      <button data-go="notes">Notes</button>
+      <button data-go="settings">Settings</button>
+      <button data-go="detail">Photo detail</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="section-label">Simulate device state</div>
+    <div class="sim"><div><strong>Location services</strong><small>GPS hardware toggle</small></div><div class="switch on" data-sim="gps"></div></div>
+    <div class="sim"><div><strong>Location permission</strong><small>App-level grant</small></div><div class="switch on" data-sim="loc"></div></div>
+    <div class="sim"><div><strong>Camera permission</strong><small>Library still works</small></div><div class="switch on" data-sim="cam"></div></div>
+    <div class="sim"><div><strong>Microphone</strong><small>Only asked in Video</small></div><div class="switch on" data-sim="mic"></div></div>
+  </div>
+</aside>
+
+<!-- ================= PHONE ================= -->
+<div class="phone">
+<div class="device" id="device">
+  <div class="island"></div>
+  <div class="statusbar" id="statusbar"><span>9:41</span><span>●●● 5G</span></div>
+  <div class="toast" id="toast"><span class="ok"><svg class="i i-xs" viewBox="0 0 24 24" style="stroke-width:3"><polyline points="20 6 9 17 4 12"/></svg></span><span id="toastMsg">Saved</span></div>
+
+  <!-- ============ CAPTURE ============ -->
+  <section class="view cam on" id="v-camera">
+    <div class="vf" id="vf">
+      <div class="vf-img" id="vfImg"></div>
+      <div class="vf-scrim-t"></div>
+      <div class="vf-scrim-b"></div>
+      <div class="vf-grid" id="vfGrid"></div>
+      <div class="focus" id="focus"></div>
+      <div class="vf-flash" id="vfFlash"></div>
+    </div>
+
+    <div class="cam-blocked" id="camBlocked">
+      <div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg></div>
+      <h3>Camera is off</h3>
+      <p>Allow camera to take geotagged photos. Your library, map and notes keep working.</p>
+      <div style="display:flex;gap:var(--s-2);margin-top:var(--s-2);">
+        <button class="btn" style="background:#fff;color:#000;" data-sim-set="cam">Allow camera</button>
+        <button class="btn" style="background:#19191C;color:#fff;border:1px solid #26262A;" data-go="library">Open library</button>
+      </div>
+    </div>
+
+    <div class="rec" id="rec"><span>●</span><span id="recT">00:00</span></div>
+
+    <div class="cam-layer">
+      <div class="cam-top">
+        <div style="display:flex;gap:var(--s-2);">
+          <button class="cam-ib glass" id="btnFlash" title="Flash"><svg class="i" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
+          <button class="cam-ib glass" id="btnGrid" title="Grid"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></button>
+        </div>
+        <button class="gps glass" id="gps" style="display:none"><span class="d"></span><span id="gpsT">±4 m</span></button>
+        <button class="cam-ib glass" id="btnStampTop" title="Stamp"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+      </div>
+
+      <!-- Non-blocking inline notices -->
+      <div class="cam-inline glass" id="locNotice">
+        <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 22s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        <div class="t"><b id="locNoticeT">Location is off</b><span id="locNoticeS">Photos will still save with time & compass</span></div>
+        <button class="act" id="locNoticeBtn">Turn on</button>
+      </div>
+      <div class="cam-inline glass" id="micNotice">
+        <svg class="i i-sm" viewBox="0 0 24 24"><path d="m2 2 20 20M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M19 10v2a7 7 0 0 1-1 3.6M5 10v2a7 7 0 0 0 12 5M12 19v3"/></svg>
+        <div class="t"><b>Recording without sound</b><span>Allow microphone for audio</span></div>
+        <button class="act" data-sim-set="mic">Allow</button>
+      </div>
+
+      <div class="cam-fill"></div>
+
+      <div class="stamp-zone">
+        <div class="stamp-meta">
+          <button class="pill-btn glass" id="noteBtn">
+            <svg class="i i-xs" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            <span id="noteBtnT">Add note</span>
+          </button>
+          <button class="pill-btn glass" id="tplBtn"><span id="tplBtnT">Classic</span><svg class="i i-xs" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+        </div>
+        <div class="stamp s-glass" id="stamp"></div>
+      </div>
+
+      <div class="cam-controls">
+        <div class="zoom glass" id="zoom">
+          <button data-z="0.5">.5</button><button data-z="1" class="on">1×</button><button data-z="2">2</button><button data-z="5">5</button>
+        </div>
+        <div class="modes">
+          <button class="on" data-mode="photo">PHOTO</button>
+          <button data-mode="video">VIDEO</button>
+        </div>
+        <div class="shutter-row">
+          <button class="thumb" id="thumb"><span class="n" id="thumbN">0</span></button>
+          <button class="shutter" id="shutter"><i></i></button>
+          <button class="side-btn glass" id="flipBtn"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIBRARY ============ -->
+  <section class="view" id="v-library">
+    <header class="app-header">
+      <div><h2>Library</h2><div class="sub" id="libSub"></div></div>
+      <button class="icon-btn bordered" data-go="settings" title="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </header>
+    <div class="app-body">
+      <div class="stack">
+        <label class="search">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="libSearch" placeholder="Search places, notes, dates" />
+        </label>
+        <div class="hscroll" id="libFilters">
+          <button class="chip on" data-f="all">All</button>
+          <button class="chip" data-f="notes">With notes</button>
+          <button class="chip" data-f="video">Videos</button>
+          <button class="chip" data-f="nogps">No location</button>
+        </div>
+        <div id="libGrid" class="stack"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MAP ============ -->
+  <section class="view" id="v-map">
+    <header class="app-header">
+      <div><h2>Map</h2><div class="sub" id="mapSub"></div></div>
+      <div class="seg" style="width:140px;" id="mapLayer"><button class="on">Pins</button><button>Heat</button></div>
+    </header>
+    <div class="app-body">
+      <div class="stack">
+        <div class="map" id="mapCanvas"></div>
+        <div id="mapCard"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOTES ============ -->
+  <section class="view" id="v-notes">
+    <header class="app-header">
+      <div><h2>Notes</h2><div class="sub" id="notesSub"></div></div>
+      <button class="btn btn-primary btn-sm" id="newNoteBtn"><svg class="i i-xs" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
+    </header>
+    <div class="app-body">
+      <div class="stack">
+        <div class="alert info" id="nearbyAlert">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 22s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          <div><div class="alert-title">You're near a saved spot</div><div class="alert-body">"Ridge trail starts 200 m east" · 120 m away</div></div>
+        </div>
+        <div class="seg" id="notesSeg"><button class="on" data-v="recent">Recent</button><button data-v="nearby">Nearby</button></div>
+        <div class="list" id="notesList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="view" id="v-settings">
+    <header class="app-header">
+      <div><h2>Settings</h2><div class="sub">Permissions are asked only when needed</div></div>
+    </header>
+    <div class="app-body">
+      <div class="stack">
+        <div>
+          <div class="section-label">Permissions</div>
+          <div class="list" id="permList"></div>
+        </div>
+        <div>
+          <div class="section-label">Storage</div>
+          <div class="list">
+            <div class="row">
+              <div class="row-ic"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
+              <div class="row-main"><div class="row-title">Saved on this phone</div><div class="row-sub">Photos also go to your Gallery app</div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Capture</div>
+          <div class="list">
+            <div class="row tap" data-open-sheet="tpl"><div class="row-ic"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15h18"/></svg></div><div class="row-main"><div class="row-title">Default stamp</div><div class="row-sub" id="setTpl">Classic</div></div><svg class="i i-sm chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+            <div class="row"><div class="row-ic"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01"/></svg></div><div class="row-main"><div class="row-title">Also save original</div><div class="row-sub">Keep an unstamped copy</div></div><div class="switch" data-local-toggle></div></div>
+            <div class="row"><div class="row-ic"><svg class="i i-sm" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="row-main"><div class="row-title">Shutter sound & haptics</div></div><div class="switch on" data-local-toggle></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">About</div>
+          <div class="list">
+            <div class="row tap"><div class="row-main"><div class="row-title">Privacy policy</div></div><svg class="i i-sm chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div>
+            <div class="row"><div class="row-main"><div class="row-title">Version</div></div><span class="mono muted" style="font-size:var(--t-xs);">2.0.0 (20)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DETAIL ============ -->
+  <section class="view" id="v-detail">
+    <header class="app-header" style="padding-bottom:var(--s-3);">
+      <button class="icon-btn bordered" id="detBack"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+      <div style="text-align:center;flex:1;"><div style="font-size:var(--t-md);font-weight:600;" id="detTitle"></div><div class="sub" id="detWhen"></div></div>
+      <button class="icon-btn bordered" id="detShare"><svg class="i" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></svg></button>
+    </header>
+    <div class="app-body" style="padding:0 0 108px;">
+      <div class="detail-media" id="detMedia"><div class="stamp s-glass" id="detStamp"></div></div>
+      <div style="padding:var(--s-5);" class="stack">
+        <div>
+          <div class="section-label">Note</div>
+          <textarea class="field" id="detNote" rows="2" placeholder="Add a note about this place"></textarea>
+        </div>
+        <div>
+          <div class="section-label">Details</div>
+          <div class="card" style="padding:0 var(--s-4);"><dl class="dl" id="detDl"></dl></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--s-2);">
+          <button class="btn btn-secondary" id="detMaps"><svg class="i i-sm" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>Open in Maps</button>
+          <button class="btn btn-primary" id="detSave">Save note</button>
+        </div>
+        <button class="btn btn-ghost btn-block" style="color:var(--negative);" id="detDelete">Delete photo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tabbar on-dark" id="tabbar">
+    <button class="tab on" data-go="camera"><span class="capture-dot"><span></span></span></button>
+    <button class="tab" data-go="library"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>Library</button>
+    <button class="tab" data-go="map"><svg class="i" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>Map</button>
+    <button class="tab" data-go="notes"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Notes</button>
+    <button class="tab" data-go="settings"><svg class="i" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Settings</button>
+  </nav>
+
+  <!-- ============ SHEETS ============ -->
+  <div class="scrim" id="scrim"></div>
+  <div class="edit-hint glass" id="editHint"><span style="width:6px;height:6px;border-radius:50%;background:#30D158;"></span>Live preview</div>
+
+  <div class="sheet" id="sh-tpl">
+    <div class="grabber"></div>
+    <div class="sheet-head"><div><h3>Stamp</h3><p id="tplSheetSub">Changes show live on your photo above</p></div><button class="btn btn-primary btn-sm" data-close>Done</button></div>
+    <div class="stack" style="gap:var(--s-3);">
+      <div class="sheet-preview" id="tplPreview"><div class="stamp" id="tplPreviewStamp"></div></div>
+      <div class="tpl-grid" id="tplGrid"></div>
+      <div class="seg" id="surfSeg"><button class="on" data-v="s-glass">Glass</button><button data-v="s-solid">Solid</button><button data-v="s-none">No box</button></div>
+      <div class="field-chips">
+        <button class="chip on" data-field="map">Map</button>
+        <button class="chip on" data-field="coords">Coordinates</button>
+        <button class="chip on" data-field="alt">Altitude & heading</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet" id="sh-note">
+    <div class="grabber"></div>
+    <div class="sheet-head"><div><h3>Note for this spot</h3><p id="noteSheetLoc">Pinned to current location</p></div><button class="btn btn-ghost btn-sm" data-close>Cancel</button></div>
+    <div class="stack">
+      <textarea class="field" id="noteField" rows="3" placeholder="What should you remember about this place?"></textarea>
+      <div class="hscroll" id="noteSuggest">
+        <button class="chip">Site check-in</button>
+        <button class="chip">Best light early</button>
+        <button class="chip">Entrance on north side</button>
+        <button class="chip">Follow up</button>
+      </div>
+      <div class="list">
+        <div class="row"><div class="row-main"><div class="row-title">Remind me when nearby</div><div class="row-sub">Within 200 m of this spot</div></div><div class="switch" data-local-toggle></div></div>
+      </div>
+      <button class="btn btn-primary btn-lg btn-block" id="noteSave">Attach note</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="sh-perm">
+    <div class="grabber"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--s-3);padding:var(--s-2) 0 var(--s-2);">
+      <div style="width:48px;height:48px;border-radius:var(--r-lg);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 22s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      </div>
+      <h3 style="font-size:var(--t-lg);font-weight:600;" id="permSheetT">Add location to your photos</h3>
+      <p style="font-size:var(--t-sm);color:var(--text-2);max-width:280px;" id="permSheetB">Geotag uses your location only while the app is open, to stamp the place on each photo. You can still shoot without it.</p>
+      <div style="display:flex;flex-direction:column;gap:var(--s-2);width:100%;margin-top:var(--s-2);">
+        <button class="btn btn-primary btn-lg btn-block" id="permAllow">Continue</button>
+        <button class="btn btn-ghost btn-block" data-close>Not now</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="homebar on-dark" id="homebar"></div>
+</div>
+</div>
+
+<script>
+const IMG = {
+  lake: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=600&q=70',
+  city: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=70',
+  hills:'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=70',
+  forest:'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=600&q=70',
+  peak: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=600&q=70',
+  street:'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=600&q=70',
+  coast:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=70'
+};
+
+const S = {
+  view: 'camera', prevView: 'library',
+  gps: true, loc: true, cam: true, mic: true, cloud: true,
+  flash: false, grid: false, mode: 'photo', rec: false, recS: 0, recI: null,
+  tpl: 'classic', surf: 's-glass', fields: { map: true, coords: true, alt: true },
+  draft: '', filter: 'all', query: '', detail: null, mapSel: null, notesTab: 'recent',
+  items: [
+    { id: 1, place: 'Lago di Braies', area: 'South Tyrol, Italy', lat: '46.6943° N', lng: '12.0858° E', alt: '1496 m', hdg: '312° NW', day: 'Today', time: '09:12', note: 'Boat rental opens 8:30 — shoot before the crowds.', img: IMG.lake, x: 58, y: 34, video: false, synced: true },
+    { id: 2, place: 'Seceda Ridge', area: 'Val Gardena, Italy', lat: '46.6008° N', lng: '11.7230° E', alt: '2519 m', hdg: '48° NE', day: 'Today', time: '07:40', note: 'Ridge trail starts 200 m east of the lift.', img: IMG.peak, x: 40, y: 22, video: false, synced: true },
+    { id: 3, place: 'Ortisei Centre', area: 'Val Gardena, Italy', lat: '46.5747° N', lng: '11.6717° E', alt: '1236 m', hdg: '180° S', day: 'Today', time: '18:05', note: '', img: IMG.street, x: 30, y: 52, video: true, dur: '0:24', synced: false },
+    { id: 4, place: 'Alpe di Siusi', area: 'South Tyrol, Italy', lat: '46.5402° N', lng: '11.6229° E', alt: '1844 m', hdg: '96° E', day: 'Nov 22', time: '06:30', note: 'Sunrise point — park at Compatsch, 20 min walk.', img: IMG.hills, x: 26, y: 70, video: false, synced: true },
+    { id: 5, place: 'Forest trail', area: 'Fiè allo Sciliar', lat: '—', lng: '—', alt: '—', hdg: '220° SW', day: 'Nov 22', time: '14:18', note: '', img: IMG.forest, x: null, y: null, video: false, synced: true, nogps: true },
+    { id: 6, place: 'Bolzano', area: 'South Tyrol, Italy', lat: '46.4983° N', lng: '11.3548° E', alt: '262 m', hdg: '12° N', day: 'Nov 21', time: '20:44', note: 'Site visit #2 — facade lighting needs follow up.', img: IMG.city, x: 72, y: 78, video: false, synced: true }
+  ]
+};
+
+const TPL = {
+  classic: { name: 'Classic', desc: 'Map, place, coordinates' },
+  time:    { name: 'Timestamp', desc: 'Large time, place' },
+  survey:  { name: 'Survey', desc: 'Lat · Lng · Alt grid' },
+  minimal: { name: 'Minimal', desc: 'One line, no box' }
+};
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+const ICON = {
+  note: '<svg class="i i-xs" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  play: '<svg class="i i-xs" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M7 4v16l13-8z"/></svg>',
+  cloudOff: '<svg class="i i-xs" viewBox="0 0 24 24"><path d="m2 2 20 20M5.8 5.8A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.3-.2M21.5 15.5A4.5 4.5 0 0 0 17.5 10h-1.8A7 7 0 0 0 10 5.1"/></svg>',
+  pin: '<svg class="i i-xs" viewBox="0 0 24 24"><path d="M12 22s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+  chev: '<svg class="i i-sm chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>'
+};
+
+function toast(msg) {
+  $('#toastMsg').textContent = msg;
+  const t = $('#toast'); t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------------- Navigation ---------------- */
+function go(v) {
+  if (v === 'detail' && !S.detail) S.detail = S.items[0]?.id;
+  if (v !== 'detail') S.prevView = v;
+  S.view = v;
+  $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
+  $$('#panelNav button').forEach(b => b.classList.toggle('on', b.dataset.go === v));
+  $$('#tabbar .tab').forEach(b => b.classList.toggle('on', b.dataset.go === v));
+  const dark = v === 'camera';
+  $('#tabbar').classList.toggle('on-dark', dark);
+  $('#statusbar').classList.toggle('on-dark', dark || document.body.dataset.mode === 'dark');
+  $('#homebar').classList.toggle('on-dark', dark || document.body.dataset.mode === 'dark');
+  $('#tabbar').style.display = v === 'detail' ? 'none' : '';
+  closeSheets();
+  render();
+}
+
+/* ---------------- Sheets ---------------- */
+function openSheet(id) {
+  closeSheets();
+  $('#scrim').classList.add('on');
+  $('#sh-' + id).classList.add('on');
+  if (id === 'tpl') startStampEdit();
+  if (id === 'note') {
+    $('#noteField').value = S.draft;
+    $('#noteSheetLoc').textContent = hasLoc() ? 'Pinned to Lago di Braies · 46.6943° N, 12.0858° E' : 'No location — note will attach to the photo only';
+  }
+}
+function closeSheets() {
+  $('#scrim').classList.remove('on'); $$('.sheet').forEach(s => s.classList.remove('on'));
+  $('#device').classList.remove('editing');
+  $('.stamp-zone').style.bottom = '';
+}
+function startStampEdit() {
+  const onCam = S.view === 'camera';
+  $('#tplPreview').classList.toggle('show', !onCam);
+  $('#tplSheetSub').textContent = onCam ? 'Changes show live on your photo above' : 'Preview of your default stamp';
+  if (!onCam) return;
+  const dev = $('#device'), sheet = $('#sh-tpl');
+  dev.classList.add('editing');
+  requestAnimationFrame(() => {
+    const h = sheet.offsetHeight;
+    $('.stamp-zone').style.bottom = (h - 84 + 12) + 'px';
+    const zone = $('.stamp-zone').getBoundingClientRect(), d = dev.getBoundingClientRect();
+    $('#editHint').style.bottom = (d.bottom - zone.top + 8) + 'px';
+  });
+}
+function bumpStamp() {
+  ['#stamp', '#tplPreviewStamp'].forEach(sel => { const el = $(sel); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); });
+}
+
+/* ---------------- Sim state ---------------- */
+const hasLoc = () => S.gps && S.loc;
+function setSim(k, v) {
+  S[k] = v;
+  $$(`[data-sim="${k}"]`).forEach(sw => sw.classList.toggle('on', v));
+  render();
+}
+
+/* ---------------- Render ---------------- */
+function render() {
+  renderCamera();
+  if (S.view === 'library') renderLibrary();
+  if (S.view === 'map') renderMap();
+  if (S.view === 'notes') renderNotes();
+  if (S.view === 'settings') renderSettings();
+  if (S.view === 'detail') renderDetail();
+}
+
+function stampHTML(d) {
+  const f = S.fields;
+  const note = d.note ? `<div class="st-note">${esc(d.note)}</div>` : '';
+  if (S.tpl === 'classic') return `
+    <div class="st-row">
+      ${f.map && d.hasLoc ? '<div class="st-map"></div>' : ''}
+      <div class="st-body">
+        <div class="st-title">${esc(d.place)}</div>
+        <div class="st-sub">${esc(d.area)}</div>
+        <div class="st-mono">${f.coords ? `<span>${d.lat}, ${d.lng}</span>` : ''}${f.alt ? `<span>${d.alt}</span><span>${d.hdg}</span>` : ''}</div>
+        <div class="st-mono" style="opacity:.6;margin-top:2px;">${d.stamp}</div>
+      </div>
+    </div>${note}`;
+  if (S.tpl === 'time') return `
+    <div class="st-row" style="align-items:flex-end;justify-content:space-between;">
+      <div class="st-big">${d.time}</div>
+      <div class="st-body" style="text-align:right;">
+        <div class="st-title">${esc(d.place)}</div>
+        <div class="st-sub">${d.date}</div>
+        ${f.coords ? `<div class="st-mono" style="justify-content:flex-end;">${d.lat}, ${d.lng}</div>` : ''}
+      </div>
+    </div>${note}`;
+  if (S.tpl === 'survey') return `
+    <div class="st-title">${esc(d.place)}</div>
+    <div class="st-sub">${d.stamp}</div>
+    <div class="st-grid">
+      <div class="st-cell"><small>LAT</small>${d.lat}</div>
+      <div class="st-cell"><small>LNG</small>${d.lng}</div>
+      <div class="st-cell"><small>ALT</small>${d.alt}</div>
+    </div>${note}`;
+  return `<div class="st-title" style="font-size:var(--t-sm);">${esc(d.place)}</div><div class="st-mono" style="margin-top:2px;">${d.stamp}${f.coords && d.hasLoc ? ' · ' + d.lat + ', ' + d.lng : ''}</div>${note}`;
+}
+
+function liveData() {
+  const ok = hasLoc();
+  return {
+    hasLoc: ok,
+    place: ok ? 'Lago di Braies' : (S.loc ? 'Last known · Braies' : 'No location'),
+    area: ok ? 'South Tyrol, Italy' : (S.loc ? 'Waiting for GPS' : 'Location permission off'),
+    lat: ok ? '46.6943° N' : '—', lng: ok ? '12.0858° E' : '—',
+    alt: ok ? '1496 m' : '— m', hdg: '312° NW',
+    time: '09:41', date: '24 Nov 2026', stamp: '24 Nov 2026 · 09:41',
+    note: S.draft
+  };
+}
+
+function renderCamera() {
+  $('#camBlocked').classList.toggle('show', !S.cam);
+
+  const g = $('#gps'); g.classList.remove('warn', 'off');
+  if (!S.loc) { g.classList.add('off'); $('#gpsT').textContent = 'No location'; }
+  else if (!S.gps) { g.classList.add('warn'); $('#gpsT').textContent = 'GPS off'; }
+  else $('#gpsT').textContent = '±4 m';
+
+  const n = $('#locNotice');
+  n.classList.toggle('show', !hasLoc());
+  if (!S.loc) { $('#locNoticeT').textContent = 'Location not allowed'; $('#locNoticeS').textContent = 'Photos still save with time & compass'; $('#locNoticeBtn').textContent = 'Allow'; }
+  else { $('#locNoticeT').textContent = 'Location services are off'; $('#locNoticeS').textContent = 'Using last known place for now'; $('#locNoticeBtn').textContent = 'Turn on'; }
+
+  $('#micNotice').classList.toggle('show', S.mode === 'video' && !S.mic);
+
+  $('#noteBtn').classList.toggle('filled', !!S.draft);
+  $('#noteBtnT').textContent = S.draft || 'Add note';
+  $('#tplBtnT').textContent = TPL[S.tpl].name;
+
+  const keepBump = c => c.contains('bump') ? ' bump' : '';
+  const st = $('#stamp'); st.className = 'stamp ' + S.surf + keepBump(st.classList); st.innerHTML = stampHTML(liveData());
+  const pv = $('#tplPreviewStamp'); pv.className = 'stamp ' + S.surf + keepBump(pv.classList); pv.innerHTML = stampHTML(liveData());
+  $('#tplPreview').style.backgroundImage = `url(${IMG.lake})`;
+
+  const last = S.items[0];
+  $('#thumb').style.backgroundImage = last ? `url(${last.img})` : 'none';
+  $('#thumbN').textContent = S.items.length;
+  $('#setTpl') && ($('#setTpl').textContent = TPL[S.tpl].name);
+}
+
+function filtered() {
+  const q = S.query.trim().toLowerCase();
+  return S.items.filter(i => {
+    if (S.filter === 'notes' && !i.note) return false;
+    if (S.filter === 'video' && !i.video) return false;
+    if (S.filter === 'nogps' && !i.nogps) return false;
+    if (q && !(`${i.place} ${i.area} ${i.note} ${i.day}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderLibrary() {
+  const notes = S.items.filter(i => i.note).length;
+  $('#libSub').textContent = `${S.items.length} items · ${notes} with notes`;
+
+
+  const list = filtered();
+  if (!list.length) {
+    $('#libGrid').innerHTML = `<div class="empty"><div class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><b>Nothing here</b><span>Try another filter or search term.</span></div>`;
+    return;
+  }
+  const groups = {};
+  list.forEach(i => (groups[i.day] ||= []).push(i));
+  $('#libGrid').innerHTML = Object.entries(groups).map(([d, arr]) => `
+    <div>
+      <div class="date-head"><b>${d}</b><span>${arr.length} ${arr.length === 1 ? 'item' : 'items'}</span></div>
+      <div class="grid">${arr.map(i => `
+        <div class="tile" data-open="${i.id}" style="background-image:url(${i.img})">
+          <div class="flags">
+            ${i.note ? `<span class="flag">${ICON.note}</span>` : ''}
+          </div>
+          ${i.video ? `<span class="dur">${ICON.play} ${i.dur}</span>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderMap() {
+  const pins = S.items.filter(i => i.x != null);
+  $('#mapSub').textContent = `${pins.length} places · ${S.items.length - pins.length} without location`;
+  if (!S.mapSel || !pins.find(p => p.id === S.mapSel)) S.mapSel = pins[0]?.id;
+  $('#mapCanvas').innerHTML = `
+    <div class="map-bg"></div>
+    <div class="map-water" style="width:120px;height:80px;left:52%;top:22%;"></div>
+    <div class="map-road" style="left:-10%;right:-10%;top:48%;height:10px;transform:rotate(-12deg);"></div>
+    <div class="map-road" style="top:-10%;bottom:-10%;left:38%;width:8px;transform:rotate(8deg);"></div>
+    ${pins.map(p => `
+      <div class="pin ${p.id === S.mapSel ? 'on' : ''}" data-pin="${p.id}" style="left:${p.x}%;top:${p.y}%;">
+        <div class="bubble" style="background-image:url(${p.img})"></div>
+        ${p.note ? `<span class="count">${ICON.note.replace('i-xs','').replace('class="i','class="i" style="width:10px;height:10px')}</span>` : ''}
+        <div class="stem"></div>
+      </div>`).join('')}
+    <div class="map-ctrls">
+      <button class="icon-btn"><svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="icon-btn"><svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+      <button class="icon-btn"><svg class="i i-sm" viewBox="0 0 24 24"><path d="m3 11 19-9-9 19-2-8z"/></svg></button>
+    </div>`;
+  const s = S.items.find(i => i.id === S.mapSel);
+  $('#mapCard').innerHTML = s ? `
+    <div class="list">
+      <div class="row tap" data-open="${s.id}">
+        <div class="note-thumb" style="background-image:url(${s.img});width:48px;height:48px;"></div>
+        <div class="row-main"><div class="row-title">${esc(s.place)}</div><div class="row-sub">${s.note ? esc(s.note) : s.day + ' · ' + s.time}</div></div>
+        ${ICON.chev}
+      </div>
+      <div class="row"><div class="row-main mono" style="font-size:var(--t-xs);color:var(--text-2);">${s.lat}, ${s.lng} · ${s.alt}</div><button class="btn btn-ghost btn-sm" data-toast="Directions opened">Directions</button></div>
+    </div>` : '';
+}
+
+function renderNotes() {
+  const list = S.items.filter(i => i.note);
+  $('#notesSub').textContent = `${list.length} notes across ${new Set(list.map(i => i.area)).size} areas`;
+  $('#nearbyAlert').style.display = hasLoc() ? '' : 'none';
+  const sorted = S.notesTab === 'nearby' ? [...list].sort((a, b) => (a.x ?? 999) - (b.x ?? 999)) : list;
+  $('#notesList').innerHTML = sorted.length ? sorted.map((i, idx) => `
+    <div class="note" data-open="${i.id}" style="${idx ? 'border-top:1px solid var(--border);' : ''}">
+      <div class="note-top">
+        <div class="note-loc">${ICON.pin}<span>${esc(i.place)}</span></div>
+        ${S.notesTab === 'nearby' ? `<span class="badge">${(idx * 1.4 + 0.12).toFixed(1)} km</span>` : `<span class="badge">${i.day}</span>`}
+      </div>
+      <div style="display:flex;gap:var(--s-3);align-items:flex-start;">
+        <p style="flex:1;">${esc(i.note)}</p>
+        <div class="note-thumb" style="background-image:url(${i.img})"></div>
+      </div>
+      <div class="note-foot"><span class="mono">${i.lat}, ${i.lng}</span></div>
+    </div>`).join('') : `<div class="empty"><div class="ic">${ICON.note}</div><b>No notes yet</b><span>Add a note while shooting or from any photo.</span></div>`;
+}
+
+function renderSettings() {
+  const perms = [
+    { k: 'cam', t: 'Camera', s: 'Needed to take photos', ic: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>' },
+    { k: 'loc', t: 'Location', s: S.loc ? (S.gps ? 'Precise · while using app' : 'Allowed · GPS is off') : 'Photos save without place', ic: '<path d="M12 22s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="10" r="2.5"/>' },
+    { k: 'mic', t: 'Microphone', s: 'Only for video sound', ic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/>' },
+    { k: 'photos', t: 'Save to Photos', s: 'No access needed on Android 10+', ic: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>' }
+  ];
+  $('#permList').innerHTML = perms.map(p => {
+    let badge;
+    if (p.k === 'photos') badge = '<span class="badge pos"><span class="d"></span>Not required</span>';
+    else if (p.k === 'loc' && S.loc && !S.gps) badge = '<span class="badge warn"><span class="d"></span>GPS off</span>';
+    else badge = S[p.k] ? '<span class="badge pos"><span class="d"></span>Allowed</span>' : `<button class="btn btn-secondary btn-sm" data-sim-set="${p.k}">Allow</button>`;
+    return `<div class="row"><div class="row-ic"><svg class="i i-sm" viewBox="0 0 24 24">${p.ic}</svg></div><div class="row-main"><div class="row-title">${p.t}</div><div class="row-sub">${p.s}</div></div>${badge}</div>`;
+  }).join('');
+}
+
+function renderDetail() {
+  const i = S.items.find(x => x.id === S.detail); if (!i) return;
+  $('#detTitle').textContent = i.place;
+  $('#detWhen').textContent = `${i.day} · ${i.time}`;
+  $('#detMedia').style.backgroundImage = `url(${i.img})`;
+  const ds = $('#detStamp'); ds.className = 'stamp ' + S.surf;
+  const savedTpl = S.tpl;
+  ds.innerHTML = stampHTML({ hasLoc: !i.nogps, place: i.place, area: i.area, lat: i.lat, lng: i.lng, alt: i.alt, hdg: i.hdg, time: i.time, date: i.day, stamp: `${i.day} · ${i.time}`, note: i.note });
+  $('#detNote').value = i.note || '';
+  $('#detDl').innerHTML = `
+    <dt>Coordinates</dt><dd>${i.lat}, ${i.lng}</dd>
+    <dt>Altitude</dt><dd>${i.alt}</dd>
+    <dt>Heading</dt><dd>${i.hdg}</dd>
+    <dt>Type</dt><dd>${i.video ? 'Video · ' + i.dur : 'Photo · 12 MP'}</dd>
+    <dt>Saved to</dt><dd>Gallery · Geotag album</dd>`;
+}
+
+/* ---------------- Capture ---------------- */
+function capture(kind) {
+  const ok = hasLoc();
+  S.items.unshift({
+    id: Date.now(), place: ok ? 'Lago di Braies' : 'Untitled place', area: ok ? 'South Tyrol, Italy' : 'No location',
+    lat: ok ? '46.6943° N' : '—', lng: ok ? '12.0858° E' : '—', alt: ok ? '1496 m' : '—', hdg: '312° NW',
+    day: 'Today', time: '09:41', note: S.draft, img: IMG.lake,
+    x: ok ? 54 + Math.round(Math.random() * 10 - 5) : null, y: ok ? 36 + Math.round(Math.random() * 10 - 5) : null,
+    video: kind === 'video', dur: kind === 'video' ? `0:${String(S.recS).padStart(2, '0')}` : undefined,
+    synced: S.cloud, nogps: !ok
+  });
+  S.draft = '';
+  render();
+  toast(kind === 'video' ? 'Video saved to Library' : 'Photo saved to Library');
+}
+
+/* ---------------- Events ---------------- */
+document.addEventListener('click', e => {
+  const t = e.target;
+  const goEl = t.closest('[data-go]'); if (goEl) { go(goEl.dataset.go); return; }
+  const simSet = t.closest('[data-sim-set]'); if (simSet) {
+    const k = simSet.dataset.simSet;
+    if (k === 'loc' || (k === 'cam' && !S.cam)) { /* show rationale sheet first for location */ }
+    setSim(k, true); toast(({ cam: 'Camera allowed', mic: 'Microphone allowed', cloud: 'Backup turned on', loc: 'Location allowed', gps: 'Location services on' })[k]); return;
+  }
+  const sim = t.closest('[data-sim]'); if (sim) { setSim(sim.dataset.sim, !S[sim.dataset.sim]); return; }
+  const lt = t.closest('[data-local-toggle]'); if (lt) { lt.classList.toggle('on'); return; }
+  const open = t.closest('[data-open]'); if (open) { S.detail = +open.dataset.open; go('detail'); return; }
+  const pin = t.closest('[data-pin]'); if (pin) { S.mapSel = +pin.dataset.pin; renderMap(); return; }
+  const ts = t.closest('[data-toast]'); if (ts) { toast(ts.dataset.toast); return; }
+  if (t.closest('[data-close]') || t === $('#scrim')) { closeSheets(); return; }
+  const os = t.closest('[data-open-sheet]'); if (os) { openSheet(os.dataset.openSheet); return; }
+});
+
+// Panel segmented controls
+$$('#segTheme button').forEach(b => b.onclick = () => { $$('#segTheme button').forEach(x => x.classList.toggle('on', x === b)); document.body.dataset.theme = b.dataset.v; go(S.view); });
+$$('#segMode button').forEach(b => b.onclick = () => { $$('#segMode button').forEach(x => x.classList.toggle('on', x === b)); document.body.dataset.mode = b.dataset.v; go(S.view); });
+
+// Camera
+$('#vf').addEventListener('click', e => {
+  const r = $('#vf').getBoundingClientRect(), f = $('#focus');
+  f.style.left = (e.clientX - r.left) + 'px'; f.style.top = (e.clientY - r.top) + 'px';
+  f.classList.remove('show'); void f.offsetWidth; f.classList.add('show');
+  clearTimeout(f._t); f._t = setTimeout(() => f.classList.remove('show'), 900);
+});
+$('#btnFlash').onclick = () => { S.flash = !S.flash; $('#btnFlash').classList.toggle('on', S.flash); };
+$('#btnGrid').onclick = () => { S.grid = !S.grid; $('#btnGrid').classList.toggle('on', S.grid); $('#vfGrid').classList.toggle('on', S.grid); };
+$('#btnStampTop').onclick = () => openSheet('tpl');
+$('#tplBtn').onclick = () => openSheet('tpl');
+$('#noteBtn').onclick = () => openSheet('note');
+$('#thumb').onclick = () => go('library');
+$('#flipBtn').onclick = () => toast('Switched camera');
+$('#gps').onclick = () => {
+  if (!S.loc) { $('#permSheetT').textContent = 'Add location to your photos'; $('#permSheetB').textContent = 'Geotag uses your location only while the app is open, to stamp the place on each photo. You can still shoot without it.'; openSheet('perm'); $('#permAllow').onclick = () => { setSim('loc', true); closeSheets(); toast('Location allowed'); }; }
+  else if (!S.gps) { $('#permSheetT').textContent = 'Turn on location services'; $('#permSheetB').textContent = 'Your phone\'s location is off. Turn it on in quick settings to add the place to new photos.'; openSheet('perm'); $('#permAllow').onclick = () => { setSim('gps', true); closeSheets(); toast('Location services on'); }; }
+  else toast('Precise location · ±4 m');
+};
+$('#locNoticeBtn').onclick = () => $('#gps').click();
+$$('#zoom button').forEach(b => b.onclick = () => {
+  $$('#zoom button').forEach(x => x.classList.toggle('on', x === b));
+  const z = +b.dataset.z; $('#vfImg').style.transform = `scale(${z === 0.5 ? 0.95 : z === 1 ? 1 : z === 2 ? 1.25 : 1.6})`;
+});
+$$('.modes button').forEach(b => b.onclick = () => {
+  S.mode = b.dataset.mode;
+  $$('.modes button').forEach(x => x.classList.toggle('on', x === b));
+  $('#shutter').classList.toggle('video', S.mode === 'video');
+  if (S.mode === 'photo' && S.rec) stopRec();
+  if (S.mode === 'video' && !S.mic) { /* mic is asked just-in-time; inline notice shows */ }
+  renderCamera();
+});
+function stopRec() { S.rec = false; clearInterval(S.recI); $('#shutter').classList.remove('recording'); $('#rec').classList.remove('show'); }
+$('#shutter').onclick = () => {
+  if (!S.cam) return;
+  if (S.mode === 'video') {
+    if (!S.rec) {
+      S.rec = true; S.recS = 0; $('#recT').textContent = '00:00';
+      $('#shutter').classList.add('recording'); $('#rec').classList.add('show');
+      S.recI = setInterval(() => { S.recS++; $('#recT').textContent = '00:' + String(S.recS).padStart(2, '0'); }, 1000);
+    } else { stopRec(); capture('video'); }
+    return;
+  }
+  $('#vfFlash').classList.add('fire'); setTimeout(() => $('#vfFlash').classList.remove('fire'), 90);
+  capture('photo');
+};
+
+// Template sheet
+function renderTplGrid() {
+  $('#tplGrid').innerHTML = Object.entries(TPL).map(([k, v]) => `<button class="tpl ${k === S.tpl ? 'on' : ''}" data-tpl="${k}"><div class="prev"></div><b>${v.name}</b><span>${v.desc}</span></button>`).join('');
+  $$('#tplGrid .tpl').forEach(b => b.onclick = () => { S.tpl = b.dataset.tpl; renderTplGrid(); render(); bumpStamp(); });
+}
+renderTplGrid();
+$$('#surfSeg button').forEach(b => b.onclick = () => { S.surf = b.dataset.v; $$('#surfSeg button').forEach(x => x.classList.toggle('on', x === b)); render(); bumpStamp(); });
+$$('[data-field]').forEach(sw => sw.onclick = () => { const f = sw.dataset.field; S.fields[f] = !S.fields[f]; sw.classList.toggle('on', S.fields[f]); render(); bumpStamp(); });
+
+// Note sheet
+$$('#noteSuggest .chip').forEach(c => c.onclick = () => { $('#noteField').value = c.textContent; });
+$('#noteSave').onclick = () => { S.draft = $('#noteField').value.trim(); closeSheets(); render(); toast(S.draft ? 'Note will be added to next photo' : 'Note removed'); };
+$('#newNoteBtn').onclick = () => { go('camera'); setTimeout(() => openSheet('note'), 30); };
+
+// Library
+$('#libSearch').oninput = e => { S.query = e.target.value; renderLibrary(); };
+$$('#libFilters .chip').forEach(c => c.onclick = () => { S.filter = c.dataset.f; $$('#libFilters .chip').forEach(x => x.classList.toggle('on', x === c)); renderLibrary(); });
+
+// Notes tabs
+$$('#notesSeg button').forEach(b => b.onclick = () => { S.notesTab = b.dataset.v; $$('#notesSeg button').forEach(x => x.classList.toggle('on', x === b)); renderNotes(); });
+$$('#mapLayer button').forEach(b => b.onclick = () => $$('#mapLayer button').forEach(x => x.classList.toggle('on', x === b)));
+
+// Detail
+$('#detBack').onclick = () => go(S.prevView || 'library');
+$('#detShare').onclick = () => toast('Share sheet opened');
+$('#detMaps').onclick = () => toast('Opened in Maps');
+$('#detSave').onclick = () => { const i = S.items.find(x => x.id === S.detail); i.note = $('#detNote').value.trim(); renderDetail(); toast('Note saved'); };
+$('#detDelete').onclick = () => { S.items = S.items.filter(x => x.id !== S.detail); S.detail = null; go(S.prevView || 'library'); toast('Photo deleted'); };
+
+go('camera');
+</script>
+</body>
+</html>
