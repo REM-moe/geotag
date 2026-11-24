@@ -270,12 +270,19 @@ class StampView extends StatelessWidget {
           child: f.showMap && data.hasLocation
               ? Padding(
                   padding: const EdgeInsets.only(right: Space.s3),
-                  child: MapThumbnail(
-                    latitude: data.latitude,
-                    longitude: data.longitude,
-                    headingDeg: data.heading,
-                    size: 56,
-                    live: liveMap,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      border: Border.all(color: p.divider, width: 1),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: MapThumbnail(
+                      latitude: data.latitude,
+                      longitude: data.longitude,
+                      headingDeg: data.heading,
+                      size: 62,
+                      live: liveMap,
+                    ),
                   ),
                 )
               : const SizedBox.shrink(),
@@ -285,19 +292,33 @@ class StampView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _text(data.place, _title()),
-              if (data.area.isNotEmpty) _text(data.area, _sub(p)),
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: data.hasLocation ? GeoColors.light.accent : p.fg.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  Expanded(child: _text(data.place, _title())),
+                ],
+              ),
+              if (data.area.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: _text(data.area, _sub(p)),
+                ),
               if (monoParts.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: Space.s1),
-                  child: Wrap(
-                    spacing: Space.s3,
-                    children: [for (final m in monoParts) Text(m, style: _mono(p))],
-                  ),
+                  padding: const EdgeInsets.only(top: 6),
+                  child: _text(monoParts.join(' · '), _mono(p)),
                 ),
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: _text(data.stampText, _mono(p, 0.6)),
+                child: _text(data.stampText.toUpperCase(), _mono(p, 0.58)),
               ),
             ],
           ),
@@ -307,38 +328,44 @@ class StampView extends StatelessWidget {
   }
 
   Widget _timestamp(_Palette p) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Text(
-          data.timeText,
-          style: TextStyle(
-            fontSize: CamSize.displayText,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -1,
-            height: 1,
-            fontFeatures: const [FontFeature.tabularFigures()],
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            data.timeText,
+            style: TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -1.4,
+              height: 1,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
-        ),
-        const SizedBox(width: Space.s3),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _text(data.place, _title(), align: TextAlign.end),
-              _text(data.dateText, _sub(p), align: TextAlign.end),
-              if (config.showCoords)
-                Padding(
-                  padding: const EdgeInsets.only(top: Space.s1),
-                  child: _text('${data.latText}, ${data.lngText}', _mono(p), align: TextAlign.end),
-                ),
-              if (config.showAltHeading)
-                _text('${data.altText}  ${data.headingText}', _mono(p, 0.6), align: TextAlign.end),
-            ],
+          Container(
+            width: 1,
+            margin: const EdgeInsets.symmetric(horizontal: Space.s3, vertical: 2),
+            color: p.divider,
           ),
-        ),
-      ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _text(data.place, _title(), align: TextAlign.end),
+                _text(data.dateText.toUpperCase(), _mono(p, 0.62), align: TextAlign.end),
+                if (config.showCoords)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: _text('${data.latText}, ${data.lngText}', _mono(p), align: TextAlign.end),
+                  ),
+                if (config.showAltHeading)
+                  _text('${data.altText} · ${data.headingText}', _mono(p, 0.6), align: TextAlign.end),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -346,7 +373,11 @@ class StampView extends StatelessWidget {
     Widget cell(String label, String value) => Expanded(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: Space.s2, vertical: 6),
-            decoration: BoxDecoration(color: p.cell, borderRadius: BorderRadius.circular(Radii.sm)),
+            decoration: BoxDecoration(
+              color: p.cell,
+              borderRadius: BorderRadius.circular(Radii.sm),
+              border: Border.all(color: p.divider),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -356,11 +387,12 @@ class StampView extends StatelessWidget {
                   style: TextStyle(
                     fontSize: CamSize.microText,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                    color: p.fg.withValues(alpha: 0.6),
+                    letterSpacing: 0.6,
+                    color: p.fg.withValues(alpha: 0.55),
                   ),
                 ),
-                _text(value, _mono(p, 1)),
+                const SizedBox(height: 1),
+                _text(value, _mono(p, 0.96)),
               ],
             ),
           ),
@@ -373,9 +405,23 @@ class StampView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _text(data.place, _title()),
-        _text(config.showAltHeading && config.showCoords ? '${data.stampText} · ${data.headingText}' : data.stampText,
-            _sub(p)),
+        Row(
+          children: [
+            Expanded(child: _text(data.place, _title())),
+            if (config.showAltHeading && config.showCoords)
+              Container(
+                margin: const EdgeInsets.only(left: Space.s2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: p.cell,
+                  borderRadius: BorderRadius.circular(Radii.sm),
+                  border: Border.all(color: p.divider),
+                ),
+                child: Text(data.headingText, style: _mono(p, 0.85)),
+              ),
+          ],
+        ),
+        _text(data.stampText.toUpperCase(), _mono(p, 0.58)),
         if (cells.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: Space.s2),
@@ -394,7 +440,7 @@ class StampView extends StatelessWidget {
 
   Widget _minimal(_Palette p) {
     final line = [
-      data.stampText,
+      data.stampText.toUpperCase(),
       if (config.showCoords && data.hasLocation) '${data.latText}, ${data.lngText}',
       if (config.showAltHeading) data.headingText,
     ].join(' · ');
@@ -402,8 +448,14 @@ class StampView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _text(data.place, _title(TextSize.sm)),
-        Padding(padding: const EdgeInsets.only(top: 2), child: _text(line, _mono(p))),
+        Row(
+          children: [
+            Icon(Icons.location_on_outlined, size: 13, color: p.fg.withValues(alpha: 0.85)),
+            const SizedBox(width: 4),
+            Expanded(child: _text(data.place, _title(TextSize.sm))),
+          ],
+        ),
+        Padding(padding: const EdgeInsets.only(top: 3), child: _text(line, _mono(p, 0.82))),
       ],
     );
   }
@@ -413,7 +465,13 @@ class StampView extends StatelessWidget {
       margin: const EdgeInsets.only(top: Space.s2),
       padding: const EdgeInsets.only(top: Space.s2),
       decoration: BoxDecoration(border: Border(top: BorderSide(color: p.divider))),
-      child: _text(data.note.trim(), const TextStyle(fontSize: TextSize.xs)),
+      child: Row(
+        children: [
+          Icon(Icons.edit_note_rounded, size: 14, color: p.fg.withValues(alpha: 0.7)),
+          const SizedBox(width: 6),
+          Expanded(child: _text(data.note.trim(), const TextStyle(fontSize: TextSize.xs))),
+        ],
+      ),
     );
   }
 }

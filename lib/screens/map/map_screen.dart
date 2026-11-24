@@ -12,9 +12,11 @@ import '../library/capture_format.dart';
 import '../library/capture_thumb.dart';
 import '../library/captures_builder.dart';
 
-/// Standard OpenStreetMap tiles (free, no API key). Dark mode applies a
-/// muted inverted color filter in [tileBuilder].
-const _tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+/// Satellite tiles (Esri World Imagery — free, no API key) and OpenStreetMap
+/// street fallback.
+const _satelliteTileUrl =
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const _streetTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const _userAgentPackage = 'com.aby.geotag';
 
 const _darkTileFilter = ColorFilter.matrix(<double>[
@@ -73,6 +75,7 @@ class _MapBodyState extends State<_MapBody> {
   final _map = MapController();
   String? _selectedId;
   bool _ready = false;
+  bool _satellite = true;
 
   static const _fitPadding = EdgeInsets.fromLTRB(56, 72, 56, 48);
 
@@ -146,9 +149,10 @@ class _MapBodyState extends State<_MapBody> {
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: _tileUrl,
+                        key: ValueKey(_satellite),
+                        urlTemplate: _satellite ? _satelliteTileUrl : _streetTileUrl,
                         userAgentPackageName: _userAgentPackage,
-                        tileBuilder: dark
+                        tileBuilder: !_satellite && dark
                             ? (context, tileWidget, tile) =>
                                 ColorFiltered(colorFilter: _darkTileFilter, child: tileWidget)
                             : null,
@@ -172,7 +176,10 @@ class _MapBodyState extends State<_MapBody> {
                       ),
                       SimpleAttributionWidget(
                         backgroundColor: g.bg.withValues(alpha: 0.8),
-                        source: Text('© OpenStreetMap contributors', style: TextStyle(fontSize: 10, color: g.text2)),
+                        source: Text(
+                          _satellite ? '© Esri World Imagery' : '© OpenStreetMap contributors',
+                          style: TextStyle(fontSize: 10, color: g.text2),
+                        ),
                       ),
                     ],
                   ),
@@ -181,6 +188,12 @@ class _MapBodyState extends State<_MapBody> {
                     right: Space.s3,
                     child: Column(
                       children: [
+                        GeoIconButton(
+                          icon: _satellite ? Icons.map_outlined : Icons.satellite_alt_rounded,
+                          tooltip: _satellite ? 'Switch to street map' : 'Switch to satellite',
+                          onPressed: () => setState(() => _satellite = !_satellite),
+                        ),
+                        const SizedBox(height: Space.s2),
                         GeoIconButton(icon: Icons.add_rounded, tooltip: 'Zoom in', onPressed: () => _zoom(1)),
                         const SizedBox(height: Space.s2),
                         GeoIconButton(icon: Icons.remove_rounded, tooltip: 'Zoom out', onPressed: () => _zoom(-1)),

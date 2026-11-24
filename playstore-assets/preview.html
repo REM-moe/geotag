@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Geotag — Google Play Store Graphics Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Figtree', -apple-system, sans-serif;
+    background: #F4F4F5;
+    color: #18181B;
+    padding: 40px 28px 80px;
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #E4E4E7;
+    margin-bottom: 32px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: #52525B; font-size: 14px; margin-top: 4px; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #52525B; }
+  .sec-title {
+    font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #71717A; margin: 32px 0 14px;
+  }
+  .hero-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 20px;
+    align-items: stretch;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #E4E4E7;
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    display: block;
+    border: 1px solid #E4E4E7;
+  }
+  .meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 960px) {
+    .hero-row { grid-template-columns: 1fr; }
+    .shots { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Geotag — Google Play Store Graphics Kit</h1>
+      <p class="sub">Exact Play Console PNG dimensions · Astryx neutral editorial theme</p>
+    </div>
+    <span class="mono">playstore-assets/*.png</span>
+  </header>
+
+  <div class="sec-title">Store Icon &amp; Feature Graphic</div>
+  <div class="hero-row">
+    <div class="card">
+      <img src="app-icon-512x512.png" alt="App Icon 512x512" />
+      <div class="meta"><span>App Icon</span><span class="mono">512×512</span></div>
+    </div>
+    <div class="card">
+      <img src="feature-graphic-1024x500.png" alt="Feature Graphic 1024x500" />
+      <div class="meta"><span>Feature Graphic</span><span class="mono">1024×500</span></div>
+    </div>
+  </div>
+
+  <div class="sec-title">Phone Screenshots (1080×1920 · 9:16)</div>
+  <div class="shots">
+    <div class="card">
+      <img src="screenshot-1-camera.png" alt="Slide 1" />
+      <div class="meta"><span>01 · Camera</span><span class="mono">1080×1920</span></div>
+    </div>
+    <div class="card">
+      <img src="screenshot-2-stamps.png" alt="Slide 2" />
+      <div class="meta"><span>02 · Stamps</span><span class="mono">1080×1920</span></div>
+    </div>
+    <div class="card">
+      <img src="screenshot-3-map.png" alt="Slide 3" />
+      <div class="meta"><span>03 · Map</span><span class="mono">1080×1920</span></div>
+    </div>
+    <div class="card">
+      <img src="screenshot-4-notes.png" alt="Slide 4" />
+      <div class="meta"><span>04 · Notes</span><span class="mono">1080×1920</span></div>
+    </div>
+    <div class="card">
+      <img src="screenshot-5-library.png" alt="Slide 5" />
+      <div class="meta"><span>05 · Library</span><span class="mono">1080×1920</span></div>
+    </div>
+  </div>
+</body>
+</html>

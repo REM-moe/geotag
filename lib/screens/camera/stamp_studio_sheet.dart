@@ -98,32 +98,10 @@ class _TemplateTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 34,
+                height: 38,
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(color: g.surface2, borderRadius: BorderRadius.circular(Radii.sm)),
-                child: LayoutBuilder(
-                  builder: (context, box) => Stack(
-                    children: [
-                      Positioned(
-                        left: Space.s2,
-                        top: 10,
-                        width: box.maxWidth * 0.5,
-                        height: 4,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(color: g.text2, borderRadius: BorderRadius.circular(2)),
-                        ),
-                      ),
-                      Positioned(
-                        left: Space.s2,
-                        top: 20,
-                        width: box.maxWidth * 0.34,
-                        height: 4,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(color: g.text3, borderRadius: BorderRadius.circular(2)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                child: _MiniSchematic(id: meta.id, active: on),
               ),
               const SizedBox(height: Space.s2),
               Text(
@@ -137,5 +115,86 @@ class _TemplateTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _MiniSchematic extends StatelessWidget {
+  final TemplateId id;
+  final bool active;
+  const _MiniSchematic({required this.id, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.geo;
+    final strong = active ? g.accent : g.text2;
+    final faint = active ? g.accent.withValues(alpha: 0.4) : g.text3;
+
+    Widget bar(double h, Color c, [double? w]) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2)),
+        );
+
+    return switch (id) {
+      TemplateId.classic => Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(color: faint, borderRadius: BorderRadius.circular(4)),
+              child: Center(
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: strong, shape: BoxShape.circle),
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [bar(4, strong), const SizedBox(height: 4), bar(3, faint, 22)],
+              ),
+            ),
+          ],
+        ),
+      TemplateId.timestamp => Row(
+          children: [
+            Text('09', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1, color: strong)),
+            Container(width: 1, height: 18, margin: const EdgeInsets.symmetric(horizontal: 5), color: faint),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [bar(4, strong), const SizedBox(height: 4), bar(3, faint, 18)],
+              ),
+            ),
+          ],
+        ),
+      TemplateId.survey => Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bar(3.5, strong, 28),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Expanded(child: bar(10, faint)),
+                const SizedBox(width: 3),
+                Expanded(child: bar(10, faint)),
+                const SizedBox(width: 3),
+                Expanded(child: bar(10, faint)),
+              ],
+            ),
+          ],
+        ),
+      TemplateId.minimal => Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [bar(3.5, strong, 30), const SizedBox(height: 4), bar(2.5, faint, 42)],
+        ),
+    };
   }
 }
