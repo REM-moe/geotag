@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Geotag — Real Phone Screenshot Framer (1080×1920)</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Figtree', -apple-system, sans-serif; background: #ECECEE; color: #18181B; padding: 28px 24px 72px; }
+  .bar { max-width: 1420px; margin: 0 auto 24px; background: #fff; border: 1px solid #E4E4E7; border-radius: 14px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .bar h1 { font-size: 18px; font-weight: 700; }
+  .bar p { font-size: 13px; color: #52525B; margin-top: 2px; }
+  .btn { background: #0866FF; color: #fff; border: 0; border-radius: 9px; padding: 9px 15px; font: 600 13px 'Figtree', sans-serif; cursor: pointer; }
+  .btn.sec { background: #fff; color: #18181B; border: 1px solid #D4D4D8; }
+  .grid { max-width: 1420px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; justify-items: center; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .wrap { width: 351px; height: 624px; overflow: hidden; border-radius: 16px; border: 1px solid #D4D4D8; background: #F4F4F5; box-shadow: 0 14px 36px rgba(0,0,0,0.08); }
+  .poster { width: 540px; height: 960px; transform: scale(0.65); transform-origin: top left; background: #F4F4F5; padding: 54px 36px 0; display: flex; flex-direction: column; align-items: center; }
+  .poster h2 { font-size: 38px; font-weight: 700; letter-spacing: -0.03em; text-align: center; outline: none; }
+  .poster p { font-size: 16.5px; font-weight: 500; color: #52525B; margin-top: 8px; text-align: center; outline: none; }
+  .bezel { margin-top: 34px; width: 400px; flex: 1; background: #141416; border-radius: 46px 46px 0 0; padding: 10px 10px 0; display: flex; }
+  .slot { flex: 1; border-radius: 36px 36px 0 0; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+  .slot img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .slot .hint { padding: 24px; text-align: center; color: #71717A; font-size: 14px; font-weight: 500; }
+  .actions { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div>
+      <h1>Geotag — Real Phone Screenshot Framer</h1>
+      <p>Click any phone screen below to drop in a real screenshot from your iPhone (headlines are editable too) → Export exact 1080×1920 PNGs.</p>
+    </div>
+    <button class="btn" onclick="downloadAll()">Download All 5 PNGs</button>
+  </div>
+  <div class="grid" id="grid"></div>
+<script>
+const slides = [
+  { id: 'f1', file: 'playstore-1-camera.png', h: 'Stamp every shot.', s: 'Live GPS coordinates, altitude & satellite mini map.' },
+  { id: 'f2', file: 'playstore-2-stamps.png', h: 'Live Stamp Studio.', s: 'Switch layouts & styles right over your viewfinder.' },
+  { id: 'f3', file: 'playstore-3-map.png', h: 'Every photo, pinned.', s: 'Explore your captures on a live satellite map.' },
+  { id: 'f4', file: 'playstore-4-library.png', h: 'Built-in photo vault.', s: 'Search by place, filter notes & browse by date.' },
+  { id: 'f5', file: 'playstore-5-notes.png', h: 'Notes & zero nagging.', s: 'Pin notes to spots. Permissions only when needed.' },
+];
+
+const grid = document.getElementById('grid');
+slides.forEach((sl, idx) => {
+  const col = document.createElement('div');
+  col.className = 'col';
+  col.innerHTML = `
+    <div class="wrap">
+      <div class="poster" id="${sl.id}">
+        <h2 contenteditable="true">${sl.h}</h2>
+        <p contenteditable="true">${sl.s}</p>
+        <div class="bezel">
+          <div class="slot" onclick="pick(${idx})">
+            <div class="hint" id="hint-${idx}">Click to upload real iPhone screenshot #${idx + 1}</div>
+            <img id="img-${idx}" style="display:none" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn sec" onclick="pick(${idx})">Choose Screenshot</button>
+      <button class="btn" onclick="dl('${sl.id}','${sl.file}')">Download PNG</button>
+    </div>
+    <input type="file" accept="image/*" id="in-${idx}" style="display:none" onchange="load(${idx}, this)" />
+  `;
+  grid.appendChild(col);
+});
+
+function pick(i) { document.getElementById('in-' + i).click(); }
+function load(i, input) {
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => {
+    const img = document.getElementById('img-' + i);
+    img.src = e.target.result; img.style.display = 'block';
+    document.getElementById('hint-' + i).style.display = 'none';
+  };
+  r.readAsDataURL(file);
+}
+async function dl(id, name) {
+  const el = document.getElementById(id);
+  const prev = el.style.transform; el.style.transform = 'none';
+  try {
+    const url = await htmlToImage.toPng(el, { width: 540, height: 960, pixelRatio: 2 });
+    const a = document.createElement('a'); a.download = name; a.href = url; a.click();
+  } finally { el.style.transform = prev; }
+}
+async function downloadAll() {
+  for (const s of slides) { await dl(s.id, s.file); await new Promise(r => setTimeout(r, 300)); }
+}
+</script>
+</body>
+</html>
