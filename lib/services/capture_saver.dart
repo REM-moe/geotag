@@ -6,6 +6,7 @@ import 'package:gal/gal.dart';
 import '../data/capture.dart';
 import '../data/capture_repository.dart';
 import 'photo_stamper.dart';
+import 'review_service.dart';
 import 'video_stamper.dart';
 
 /// Location / note snapshot taken at the moment of capture.
@@ -72,6 +73,7 @@ class CaptureSaver {
     final capture = _capture(slot.id, CaptureKind.photo, slot.mediaPath, thumbPath, meta);
     await repo.add(capture);
     final ok = await _export(() => Gal.putImage(slot.mediaPath, album: album));
+    if (ok) ReviewService.recordCaptureAndMaybePrompt();
     return SaveResult(capture, ok);
   }
 
@@ -116,6 +118,7 @@ class CaptureSaver {
     );
     await repo.add(capture);
     final ok = await _export(() => Gal.putVideo(slot.mediaPath, album: album));
+    if (ok) ReviewService.recordCaptureAndMaybePrompt();
     return SaveResult(capture, ok);
   }
 

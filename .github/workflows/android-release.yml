@@ -1,0 +1,92 @@
+name: Android Play Store Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Google Play track'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - internal
+          - alpha
+          - beta
+      status:
+        description: 'Release status'
+        required: true
+        default: 'draft'
+        type: choice
+        options:
+          - draft
+          - completed
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Configure Android signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASS
+          keyPassword=$KEYSTORE_PASS
+          keyAlias=$KEY_ALIAS
+          storeFile=$RUNNER_TEMP/upload-keystore.jks
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release App Bundle
+        run: flutter build appbundle --release
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geotag-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
+      - name: Authenticate to Google Cloud (Workload Identity)
+        id: gcp-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/889440796794/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: play-submit@salvia-prod.iam.gserviceaccount.com
+          create_credentials_file: true
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ steps.gcp-auth.outputs.credentials_file_path }}
+          packageName: com.melamphic.geotag
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track || 'production' }}
+          status: ${{ inputs.status || 'draft' }}
